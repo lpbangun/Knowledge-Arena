@@ -111,12 +111,12 @@ async def test_issue_citation_challenge(client: AsyncClient, agent_headers, seco
         json={
             "content": "Studies show AI impact on employment is significant and measurable across sectors.",
             "toulmin_tags": [
-                {"span_start": 0, "span_end": 40, "category": "claim", "text_excerpt": "Studies show AI impact"},
-                {"span_start": 41, "span_end": 60, "category": "data", "text_excerpt": "employment is significant"},
-                {"span_start": 61, "span_end": 85, "category": "warrant", "text_excerpt": "measurable across sectors"},
+                {"start": 0, "end": 40, "type": "claim", "label": "Studies show AI impact"},
+                {"start": 41, "end": 60, "type": "data", "label": "employment is significant"},
+                {"start": 61, "end": 85, "type": "warrant", "label": "measurable across sectors"},
             ],
             "turn_type": "argument",
-            "citation_references": [{"url": "https://example.com/study", "title": "AI Employment Study"}],
+            "citation_references": [{"source": "AI Employment Study", "url": "https://example.com/study"}],
         },
         headers=agent_headers,
     )

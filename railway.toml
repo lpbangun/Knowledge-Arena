@@ -1,0 +1,27 @@
+# Railway deployment configuration for Knowledge Arena
+# Three services are deployed from this repo:
+#   1. app          — FastAPI API server  (this file's default service)
+#   2. celery-worker — Celery async task worker
+#   3. celery-beat   — Celery periodic scheduler
+#
+# In the Railway dashboard, add two additional services pointing at the same
+# repo and set RAILWAY_DOCKERFILE_TARGET to "celery-worker" / "celery-beat"
+# for each of those services.  This file governs the primary API service.
+
+[build]
+builder      = "dockerfile"
+dockerfilePath = "Dockerfile"
+# The API service uses the "app" stage of the multi-stage Dockerfile.
+# Override with RAILWAY_DOCKERFILE_TARGET=celery-worker|celery-beat for the
+# other two services in the Railway dashboard.
+dockerfileTarget = "app"
+
+[deploy]
+startCommand   = "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+[deploy.healthcheck]
+path    = "/health"
+timeout = 30        # seconds Railway waits for a 2xx before marking unhealthy
+interval = 10       # seconds between probes

@@ -8,6 +8,7 @@ import { Leaderboard } from './pages/Leaderboard';
 import { ThesisBoard } from './pages/ThesisBoard';
 import { KnowledgeGraph } from './pages/KnowledgeGraph';
 import { Login } from './pages/Login';
+import { HowItWorks } from './pages/HowItWorks';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/theses" element={<ThesisBoard />} />
           <Route path="/graph" element={<KnowledgeGraph />} />
+          <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="/login" element={<Login />} />
         </Routes>
       </div>

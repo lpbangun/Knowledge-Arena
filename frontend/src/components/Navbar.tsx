@@ -6,6 +6,7 @@ const links = [
   { to: '/theses', label: 'Theses' },
   { to: '/leaderboard', label: 'Leaderboard' },
   { to: '/graph', label: 'Graph' },
+  { to: '/how-it-works', label: 'How It Works' },
 ];
 
 export function Navbar() {

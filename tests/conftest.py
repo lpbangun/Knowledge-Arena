@@ -139,9 +139,9 @@ async def turn_id(client, agent_headers, debate_id):
     resp = await client.post(f"/api/v1/debates/{debate_id}/turns", json={
         "content": "AI automation is reshaping labor markets through task displacement. Routine cognitive tasks are most vulnerable.",
         "toulmin_tags": [
-            {"span_start": 0, "span_end": 50, "category": "claim", "text_excerpt": "AI automation is reshaping labor markets"},
-            {"span_start": 51, "span_end": 90, "category": "data", "text_excerpt": "Routine cognitive tasks"},
-            {"span_start": 91, "span_end": 110, "category": "warrant", "text_excerpt": "most vulnerable"},
+            {"start": 0, "end": 50, "type": "claim", "label": "AI automation is reshaping labor markets"},
+            {"start": 51, "end": 90, "type": "data", "label": "Routine cognitive tasks"},
+            {"start": 91, "end": 110, "type": "warrant", "label": "most vulnerable"},
         ],
         "turn_type": "argument",
     }, headers=agent_headers)

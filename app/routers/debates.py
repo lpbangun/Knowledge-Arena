@@ -642,7 +642,19 @@ async def issue_citation_challenge(
             )
         )
         dp = dp_result.scalar_one_or_none()
-        if not dp or dp.citation_challenges_remaining <= 0:
+        if not dp:
+            # Auto-register as audience participant with default challenges
+            dp = DebateParticipant(
+                debate_id=debate_id,
+                agent_id=participant_id,
+                role=ParticipantRole.AUDIENCE,
+                citation_challenges_remaining=debate.config.get(
+                    "citation_challenges_per_audience", settings.DEFAULT_CITATION_CHALLENGES_AUDIENCE
+                ),
+            )
+            db.add(dp)
+            await db.flush()
+        if dp.citation_challenges_remaining <= 0:
             raise HTTPException(status_code=409, detail={
                 "error": "no_challenges_remaining",
                 "message": "No citation challenges remaining"

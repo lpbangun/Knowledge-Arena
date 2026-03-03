@@ -235,13 +235,13 @@ async def run_e2e():
         resp = await client.post(f"/api/v1/debates/{debate_id}/turns", json={
             "content": "AI automation is fundamentally reshaping labor markets through task displacement rather than whole-job elimination. According to Acemoglu & Restrepo (2020), routine cognitive tasks face the highest automation risk, with an estimated 14% of jobs substantially transformed within a decade. The mechanism operates through task-level substitution where AI systems handle specific subtasks previously requiring human cognitive effort.",
             "toulmin_tags": [
-                {"span_start": 0, "span_end": 90, "category": "claim", "text_excerpt": "AI automation is fundamentally reshaping labor markets through task displacement"},
-                {"span_start": 91, "span_end": 220, "category": "data", "text_excerpt": "Acemoglu & Restrepo (2020), routine cognitive tasks face the highest automation risk"},
-                {"span_start": 221, "span_end": 400, "category": "warrant", "text_excerpt": "The mechanism operates through task-level substitution"},
+                {"start": 0, "end": 90, "type": "claim", "label": "AI automation is fundamentally reshaping labor markets through task displacement"},
+                {"start": 91, "end": 220, "type": "data", "label": "Acemoglu & Restrepo (2020), routine cognitive tasks face the highest automation risk"},
+                {"start": 221, "end": 400, "type": "warrant", "label": "The mechanism operates through task-level substitution"},
             ],
             "turn_type": "argument",
             "citation_references": [
-                {"author": "Acemoglu & Restrepo", "year": 2020, "title": "Robots and Jobs", "doi": "10.1086/705716"}
+                {"source": "Acemoglu & Restrepo (2020) - Robots and Jobs", "url": "https://doi.org/10.1086/705716"}
             ],
         }, headers=agent_a_headers)
         if resp.status_code == 202:
@@ -259,9 +259,9 @@ async def run_e2e():
         resp = await client.post(f"/api/v1/debates/{debate_id}/turns", json={
             "content": "Historical evidence consistently shows technology augments rather than displaces human labor. The ATM paradox demonstrates this clearly — despite predictions, bank teller employment actually increased after ATM deployment because reduced branch costs enabled network expansion. Similarly, AI handles routine tasks, freeing humans for higher-value cognitive work.",
             "toulmin_tags": [
-                {"span_start": 0, "span_end": 80, "category": "claim", "text_excerpt": "technology augments rather than displaces human labor"},
-                {"span_start": 81, "span_end": 250, "category": "data", "text_excerpt": "The ATM paradox demonstrates this clearly"},
-                {"span_start": 251, "span_end": 350, "category": "warrant", "text_excerpt": "AI handles routine tasks, freeing humans for higher-value cognitive work"},
+                {"start": 0, "end": 80, "type": "claim", "label": "technology augments rather than displaces human labor"},
+                {"start": 81, "end": 250, "type": "data", "label": "The ATM paradox demonstrates this clearly"},
+                {"start": 251, "end": 350, "type": "warrant", "label": "AI handles routine tasks, freeing humans for higher-value cognitive work"},
             ],
             "turn_type": "argument",
         }, headers=agent_b_headers)
@@ -287,7 +287,7 @@ async def run_e2e():
         if turn_a_id:
             resp = await client.post(
                 f"/api/v1/debates/{debate_id}/votes",
-                params={"vote_type": "turn_quality", "target_id": turn_a_id, "score": 4},
+                json={"vote_type": "turn_quality", "target_id": turn_a_id, "score": 4},
                 headers=agent_b_headers,
             )
             if resp.status_code == 201:
@@ -306,7 +306,7 @@ async def run_e2e():
 
         resp = await client.post(
             f"/api/v1/debates/{debate_id}/comments",
-            params={"content": "The displacement argument ignores complementarity effects."},
+            json={"content": "The displacement argument ignores complementarity effects."},
             headers=agent_b_headers,
         )
         if resp.status_code == 201:
@@ -317,7 +317,7 @@ async def run_e2e():
             # Reply to comment
             resp = await client.post(
                 f"/api/v1/debates/{debate_id}/comments",
-                params={
+                json={
                     "content": "Complementarity requires retraining capacity, which varies by sector.",
                     "parent_comment_id": parent_id,
                 },
@@ -343,7 +343,7 @@ async def run_e2e():
         if turn_a_id:
             resp = await client.post(
                 f"/api/v1/debates/{debate_id}/challenges",
-                params={
+                json={
                     "target_turn_id": turn_a_id,
                     "target_citation_index": 0,
                 },

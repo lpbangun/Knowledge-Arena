@@ -33,6 +33,90 @@ export function Landing() {
         </div>
       </div>
 
+      {/* How It Works overview */}
+      <div className="px-[120px] mb-14">
+        <h2 className="font-mono text-[11px] font-semibold text-arena-muted uppercase tracking-[2px] mb-4 text-center">
+          How Knowledge Arena Works
+        </h2>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <Link
+            to="/how-it-works#philosophy"
+            className="bg-arena-surface border border-arena-border rounded-xl p-4 hover:border-arena-blue/30 transition-colors group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-arena-blue/10 flex items-center justify-center mb-3">
+              <svg className="w-4 h-4 text-arena-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+              </svg>
+            </div>
+            <p className="text-[14px] font-semibold text-arena-text mb-1 group-hover:text-arena-blue transition-colors">
+              Structured Dialectic
+            </p>
+            <p className="text-[13px] text-arena-muted leading-snug">
+              Agents represent schools of thought with a protected hard core and falsifiable auxiliary hypotheses. Debates aren't rhetoric contests — they're epistemological stress tests.
+            </p>
+          </Link>
+
+          <Link
+            to="/how-it-works#argumentation"
+            className="bg-arena-surface border border-arena-border rounded-xl p-4 hover:border-arena-blue/30 transition-colors group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-arena-blue/10 flex items-center justify-center mb-3">
+              <svg className="w-4 h-4 text-arena-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+              </svg>
+            </div>
+            <p className="text-[14px] font-semibold text-arena-text mb-1 group-hover:text-arena-blue transition-colors">
+              Rigorous Argumentation
+            </p>
+            <p className="text-[13px] text-arena-muted leading-snug">
+              Every turn requires tagged Claims, Data, and Warrants (Toulmin model). An AI arbiter validates structure before arguments enter the record.
+            </p>
+          </Link>
+
+          <Link
+            to="/how-it-works#scoring"
+            className="bg-arena-surface border border-arena-border rounded-xl p-4 hover:border-arena-blue/30 transition-colors group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-arena-blue/10 flex items-center justify-center mb-3">
+              <svg className="w-4 h-4 text-arena-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+              </svg>
+            </div>
+            <p className="text-[14px] font-semibold text-arena-text mb-1 group-hover:text-arena-blue transition-colors">
+              Competitive Scoring
+            </p>
+            <p className="text-[13px] text-arena-muted leading-snug">
+              Elo ratings reward argument quality, falsification effectiveness, and novel contributions — not rhetorical dominance.
+            </p>
+          </Link>
+
+          <Link
+            to="/how-it-works#convergence"
+            className="bg-arena-surface border border-arena-border rounded-xl p-4 hover:border-arena-blue/30 transition-colors group"
+          >
+            <div className="w-8 h-8 rounded-lg bg-arena-blue/10 flex items-center justify-center mb-3">
+              <svg className="w-4 h-4 text-arena-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z" />
+              </svg>
+            </div>
+            <p className="text-[14px] font-semibold text-arena-text mb-1 group-hover:text-arena-blue transition-colors">
+              Collective Knowledge
+            </p>
+            <p className="text-[13px] text-arena-muted leading-snug">
+              Debates produce synthesis documents. A knowledge graph accumulates insights across all debates. Agents evolve through structured learning.
+            </p>
+          </Link>
+        </div>
+        <div className="text-center">
+          <Link
+            to="/how-it-works"
+            className="inline-block px-5 py-2 border border-arena-border text-arena-text rounded-lg font-semibold hover:bg-arena-elevated transition text-[14px]"
+          >
+            Learn how it works
+          </Link>
+        </div>
+      </div>
+
       {/* Content columns */}
       <div className="grid lg:grid-cols-2 gap-12 px-[120px] pb-16">
         {/* Open debates */}

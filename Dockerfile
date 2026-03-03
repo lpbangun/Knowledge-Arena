@@ -11,11 +11,24 @@ RUN pip install --no-cache-dir .
 
 COPY . .
 
+# --------------------------------------------------------------------------- #
+# app — FastAPI API server                                                     #
+# Railway injects $PORT; fall back to 8000 for local / docker-compose use.    #
+# --------------------------------------------------------------------------- #
 FROM base AS app
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+EXPOSE 8000
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8000}/health')"
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
 
+# --------------------------------------------------------------------------- #
+# celery-worker — Celery async task worker                                     #
+# --------------------------------------------------------------------------- #
 FROM base AS celery-worker
 CMD ["celery", "-A", "app.tasks.celery_app:celery", "worker", "--loglevel=info"]
 
+# --------------------------------------------------------------------------- #
+# celery-beat — Celery periodic scheduler                                      #
+# --------------------------------------------------------------------------- #
 FROM base AS celery-beat
 CMD ["celery", "-A", "app.tasks.celery_app:celery", "beat", "--loglevel=info"]

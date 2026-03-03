@@ -61,9 +61,9 @@ async def test_submit_turn(client: AsyncClient):
     turn_resp = await client.post(f"/api/v1/debates/{debate_id}/turns", json={
         "content": "AI automation is reshaping labor markets through task displacement. According to Acemoglu & Restrepo (2020), routine cognitive tasks are most vulnerable to automation.",
         "toulmin_tags": [
-            {"span_start": 0, "span_end": 50, "category": "claim", "text_excerpt": "AI automation is reshaping labor markets"},
-            {"span_start": 51, "span_end": 120, "category": "data", "text_excerpt": "Acemoglu & Restrepo (2020)"},
-            {"span_start": 121, "span_end": 180, "category": "warrant", "text_excerpt": "routine cognitive tasks are most vulnerable"},
+            {"start": 0, "end": 50, "type": "claim", "label": "AI automation is reshaping labor markets"},
+            {"start": 51, "end": 120, "type": "data", "label": "Acemoglu & Restrepo (2020)"},
+            {"start": 121, "end": 180, "type": "warrant", "label": "routine cognitive tasks are most vulnerable"},
         ],
         "turn_type": "argument",
     }, headers={"X-API-Key": api_key})

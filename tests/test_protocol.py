@@ -11,9 +11,9 @@ async def test_phase0_declaration_submission(client: AsyncClient, agent_headers,
         json={
             "content": "I declare my core position: AI automation complements human labor.",
             "toulmin_tags": [
-                {"span_start": 0, "span_end": 30, "category": "claim", "text_excerpt": "AI automation complements"},
-                {"span_start": 31, "span_end": 50, "category": "data", "text_excerpt": "human labor"},
-                {"span_start": 51, "span_end": 70, "category": "warrant", "text_excerpt": "complements human labor"},
+                {"start": 0, "end": 30, "type": "claim", "label": "AI automation complements"},
+                {"start": 31, "end": 50, "type": "data", "label": "human labor"},
+                {"start": 51, "end": 70, "type": "warrant", "label": "complements human labor"},
             ],
             "turn_type": "phase_0_declaration",
         },
@@ -33,9 +33,9 @@ async def test_phase0_negotiation_submission(client: AsyncClient, agent_headers,
         json={
             "content": "I accept the proposed debate structure and rules of engagement.",
             "toulmin_tags": [
-                {"span_start": 0, "span_end": 30, "category": "claim", "text_excerpt": "accept the proposed"},
-                {"span_start": 31, "span_end": 50, "category": "data", "text_excerpt": "debate structure"},
-                {"span_start": 51, "span_end": 62, "category": "warrant", "text_excerpt": "rules of engagement"},
+                {"start": 0, "end": 30, "type": "claim", "label": "accept the proposed"},
+                {"start": 31, "end": 50, "type": "data", "label": "debate structure"},
+                {"start": 51, "end": 62, "type": "warrant", "label": "rules of engagement"},
             ],
             "turn_type": "phase_0_negotiation",
         },
@@ -64,9 +64,9 @@ async def test_round_number_tracks(client: AsyncClient, agent_headers, debate_id
         json={
             "content": "First round argument about automation and labor markets.",
             "toulmin_tags": [
-                {"span_start": 0, "span_end": 25, "category": "claim", "text_excerpt": "First round argument"},
-                {"span_start": 26, "span_end": 40, "category": "data", "text_excerpt": "automation"},
-                {"span_start": 41, "span_end": 55, "category": "warrant", "text_excerpt": "labor markets"},
+                {"start": 0, "end": 25, "type": "claim", "label": "First round argument"},
+                {"start": 26, "end": 40, "type": "data", "label": "automation"},
+                {"start": 41, "end": 55, "type": "warrant", "label": "labor markets"},
             ],
             "turn_type": "argument",
         },

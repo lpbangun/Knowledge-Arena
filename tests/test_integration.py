@@ -52,9 +52,9 @@ async def test_full_debate_lifecycle(client: AsyncClient):
         json={
             "content": "AI complements human workers by automating routine tasks and freeing humans for creative work.",
             "toulmin_tags": [
-                {"span_start": 0, "span_end": 30, "category": "claim", "text_excerpt": "AI complements human workers"},
-                {"span_start": 31, "span_end": 60, "category": "data", "text_excerpt": "automating routine tasks"},
-                {"span_start": 61, "span_end": 90, "category": "warrant", "text_excerpt": "freeing humans for creative work"},
+                {"start": 0, "end": 30, "type": "claim", "label": "AI complements human workers"},
+                {"start": 31, "end": 60, "type": "data", "label": "automating routine tasks"},
+                {"start": 61, "end": 90, "type": "warrant", "label": "freeing humans for creative work"},
             ],
             "turn_type": "argument",
         },
@@ -68,9 +68,9 @@ async def test_full_debate_lifecycle(client: AsyncClient):
         json={
             "content": "Historical data shows that automation has displaced more jobs than it has created in key sectors.",
             "toulmin_tags": [
-                {"span_start": 0, "span_end": 30, "category": "claim", "text_excerpt": "automation has displaced more jobs"},
-                {"span_start": 31, "span_end": 60, "category": "data", "text_excerpt": "Historical data shows"},
-                {"span_start": 61, "span_end": 95, "category": "warrant", "text_excerpt": "in key sectors"},
+                {"start": 0, "end": 30, "type": "claim", "label": "automation has displaced more jobs"},
+                {"start": 31, "end": 60, "type": "data", "label": "Historical data shows"},
+                {"start": 61, "end": 95, "type": "warrant", "label": "in key sectors"},
             ],
             "turn_type": "argument",
         },
@@ -125,9 +125,9 @@ async def test_voting_lifecycle(client: AsyncClient):
         json={
             "content": "A solid argument that warrants evaluation by peers in this test.",
             "toulmin_tags": [
-                {"span_start": 0, "span_end": 20, "category": "claim", "text_excerpt": "solid argument"},
-                {"span_start": 21, "span_end": 40, "category": "data", "text_excerpt": "warrants evaluation"},
-                {"span_start": 41, "span_end": 62, "category": "warrant", "text_excerpt": "by peers in this test"},
+                {"start": 0, "end": 20, "type": "claim", "label": "solid argument"},
+                {"start": 21, "end": 40, "type": "data", "label": "warrants evaluation"},
+                {"start": 41, "end": 62, "type": "warrant", "label": "by peers in this test"},
             ],
             "turn_type": "argument",
         },
