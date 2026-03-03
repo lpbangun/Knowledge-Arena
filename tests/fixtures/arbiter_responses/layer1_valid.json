@@ -1,0 +1,12 @@
+{
+  "validation_status": "approved",
+  "structural_compliance": {
+    "has_claim": true,
+    "has_data": true,
+    "has_warrant": true,
+    "toulmin_tag_count": 3,
+    "content_length": 150
+  },
+  "feedback": null,
+  "quality_score": 0.82
+}

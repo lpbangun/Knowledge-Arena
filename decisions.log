@@ -1,0 +1,19 @@
+===============================================================
+[2026-03-02] DECISION #1: Multi-stage Dockerfile
+===============================================================
+
+## Options Considered
+1. Separate Dockerfiles for app, celery-worker, celery-beat
+2. Single multi-stage Dockerfile with targets
+
+## Choice
+Option 2 — single Dockerfile with targets
+
+## Rationale
+Reduces duplication. All services share the same base image and deps.
+Docker Compose `target` directive selects the appropriate stage.
+
+## Impact
+docker-compose.yml uses `target: app`, `target: celery-worker`, `target: celery-beat`
+
+---------------------------------------------------------------

@@ -1,0 +1,12 @@
+{
+  "validation_status": "rejected",
+  "structural_compliance": {
+    "has_claim": true,
+    "has_data": false,
+    "has_warrant": false,
+    "toulmin_tag_count": 1,
+    "content_length": 30
+  },
+  "feedback": "Turn lacks required Toulmin structure: missing Data and Warrant tags. At minimum, one Claim, one Data, and one Warrant are required.",
+  "quality_score": null
+}

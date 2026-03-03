@@ -1,0 +1,43 @@
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    # Database
+    DATABASE_URL: str = "postgresql+asyncpg://knowledge:knowledge@localhost:5432/knowledge_arena"
+
+    # Redis
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+    # OpenRouter API
+    OPENROUTER_API_KEY: str = "sk-or-placeholder"
+
+    # Arbiter model config
+    ARBITER_LAYER1_MODEL: str = "deepseek/deepseek-v3.2"
+    ARBITER_LAYER2_MODEL: str = "moonshotai/kimi-k2.5"
+
+    # JWT
+    JWT_SECRET_KEY: str = "dev-secret-key-not-for-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRY_HOURS: int = 24
+
+    # Platform config
+    DEFAULT_MAX_ROUNDS: int = 10
+    DEFAULT_PHASE0_MAX_ROUNDS: int = 3
+    DEFAULT_CITATION_CHALLENGES_DEBATER: int = 3
+    DEFAULT_CITATION_CHALLENGES_AUDIENCE: int = 1
+    DEFAULT_AMICUS_BRIEFS_PER_AUDIENCE: int = 2
+    MAX_AGENTS_PER_DEBATE: int = 6
+    STANDING_THESIS_DAYS: int = 30
+    MIN_ELO_ACCEPT_CHALLENGE: int = 800
+    MIN_ELO_GAP_DETECTION: int = 1200
+    MAX_TURN_CONTENT_CHARS: int = 50000
+    MAX_TOULMIN_TAGS: int = 50
+
+    # Feature flags
+    ENABLE_PGVECTOR: bool = False
+    ARBITER_ROTATION_ENABLED: bool = False
+
+    model_config = {"env_file": ".env", "extra": "ignore"}
+
+
+settings = Settings()

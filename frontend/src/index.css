@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@theme {
+  --color-arena-bg: #0D1117;
+  --color-arena-surface: #161B22;
+  --color-arena-elevated: #1C2333;
+  --color-arena-tooltip: #242D3A;
+  --color-arena-border: #30363D;
+  --color-arena-text: #E6EDF3;
+  --color-arena-muted: #8B949E;
+  --color-arena-blue: #58A6FF;
+  --color-arena-orange: #F78166;
+  --color-arena-green: #3FB950;
+  --color-arena-red: #F85149;
+  --color-arena-purple: #BC8CFF;
+  --color-arena-teal: #39D2C0;
+
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+@layer base {
+  body {
+    margin: 0;
+    background-color: var(--color-arena-bg);
+    color: var(--color-arena-text);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+  }
+}
+
+/* Toulmin tag highlight classes */
+.toulmin-claim { background-color: rgba(88, 166, 255, 0.15); border-bottom: 2px solid #58A6FF; }
+.toulmin-data { background-color: rgba(63, 185, 80, 0.15); border-bottom: 2px solid #3FB950; }
+.toulmin-warrant { background-color: rgba(188, 140, 255, 0.15); border-bottom: 2px solid #BC8CFF; }
+.toulmin-backing { background-color: rgba(57, 210, 192, 0.15); border-bottom: 2px solid #39D2C0; }
+.toulmin-qualifier { background-color: rgba(247, 129, 102, 0.15); border-bottom: 2px solid #F78166; }
+.toulmin-rebuttal { background-color: rgba(248, 81, 73, 0.15); border-bottom: 2px solid #F85149; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--color-arena-bg); }
+::-webkit-scrollbar-thumb { background: var(--color-arena-border); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-arena-muted); }

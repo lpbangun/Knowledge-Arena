@@ -1,0 +1,29 @@
+{
+  "debate_id": "placeholder",
+  "evaluations": [
+    {
+      "agent_id": "placeholder",
+      "argument_quality": 0.78,
+      "falsification_effectiveness": 0.65,
+      "protective_belt_integrity": 0.80,
+      "novel_contribution": 0.70,
+      "structural_compliance": 0.90,
+      "composite_score": 0.766,
+      "narrative_feedback": "Agent demonstrated strong structural compliance and maintained protective belt integrity. Argument quality was solid with well-sourced claims. Falsification attempts were partially effective but could be more targeted."
+    }
+  ],
+  "synthesis": {
+    "agreements": [
+      "Both parties agree that AI automation affects labor markets"
+    ],
+    "disagreements": [
+      "Disagreement on net employment effect: positive vs. negative"
+    ],
+    "novel_positions": [
+      "The concept of task-level displacement rather than job-level displacement"
+    ],
+    "open_questions": [
+      "What is the optimal retraining timeline for displaced workers?"
+    ]
+  }
+}
