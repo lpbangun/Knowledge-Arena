@@ -32,20 +32,20 @@ export function AgentProfile() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex items-start gap-4 mb-8">
-        <div className="w-16 h-16 rounded-full bg-arena-elevated flex items-center justify-center font-mono text-xl text-arena-blue border border-arena-border">
+        <div className="w-16 h-16 rounded-full bg-arena-elevated flex items-center justify-center font-mono text-2xl font-bold text-arena-blue">
           {agent.name.slice(0, 2).toUpperCase()}
         </div>
         <div>
-          <h1 className="text-xl font-bold">{agent.name}</h1>
+          <h1 className="font-heading text-[28px] font-medium">{agent.name}</h1>
           <div className="flex items-center gap-4 mt-1">
-            <span className="font-mono text-lg text-arena-blue">{agent.elo_rating} Elo</span>
-            <span className="text-sm text-arena-muted">{agent.total_debates} debates</span>
+            <span className="font-mono text-[20px] font-bold text-arena-blue">{agent.elo_rating}</span>
+            <span className="text-[14px] font-medium text-arena-muted">{agent.total_debates} debates</span>
             {agent.school_of_thought && (
-              <span className="text-sm text-arena-purple">{agent.school_of_thought}</span>
+              <span className="bg-[#7C6BAF20] rounded px-2.5 py-0.5 text-[12px] text-arena-purple font-medium">{agent.school_of_thought}</span>
             )}
           </div>
           {agent.model_info && Object.keys(agent.model_info).length > 0 && (
-            <span className="text-xs font-mono text-arena-muted">
+            <span className="font-mono text-[12px] font-medium text-arena-muted mt-1 block">
               {Object.entries(agent.model_info).map(([k, v]) => `${k}: ${v}`).join(' | ')}
             </span>
           )}
@@ -55,18 +55,19 @@ export function AgentProfile() {
       {/* Elo chart (simple bar) */}
       {eloHistory?.history && eloHistory.history.length > 0 && (
         <div className="mb-8">
-          <h2 className="text-sm font-mono text-arena-muted uppercase tracking-wide mb-3">Elo History</h2>
-          <div className="bg-arena-surface border border-arena-border rounded-lg p-4">
+          <h2 className="font-mono text-[11px] font-semibold text-arena-muted uppercase tracking-[2px] mb-3">Elo History</h2>
+          <div className="bg-arena-surface border border-arena-border rounded-xl p-4">
             <div className="flex items-end gap-1 h-32">
-              {eloHistory.history.slice(-30).map((h, i) => {
+              {eloHistory.history.slice(-30).map((h, i, arr) => {
                 const min = Math.min(...eloHistory.history.map((x) => x.elo));
                 const max = Math.max(...eloHistory.history.map((x) => x.elo));
                 const range = max - min || 1;
                 const pct = ((h.elo - min) / range) * 100;
+                const isLast = i === arr.length - 1;
                 return (
                   <div
                     key={i}
-                    className="flex-1 bg-arena-blue/50 rounded-t hover:bg-arena-blue transition-colors"
+                    className={`flex-1 rounded-t transition-colors ${isLast ? 'bg-arena-blue' : 'bg-arena-blue/40'}`}
                     style={{ height: `${Math.max(pct, 5)}%` }}
                     title={`${h.elo} Elo`}
                   />
@@ -84,9 +85,9 @@ export function AgentProfile() {
       {/* Position snapshot */}
       {agent.current_position_snapshot && (
         <div className="mb-8">
-          <h2 className="text-sm font-mono text-arena-muted uppercase tracking-wide mb-3">Current Position</h2>
-          <div className="bg-arena-surface border border-arena-border rounded-lg p-4">
-            <p className="text-sm whitespace-pre-wrap">{agent.current_position_snapshot}</p>
+          <h2 className="font-mono text-[11px] font-semibold text-arena-muted uppercase tracking-[2px] mb-3">Current Position</h2>
+          <div className="bg-arena-surface border border-arena-border rounded-xl p-4">
+            <p className="text-[14px] leading-[1.6] whitespace-pre-wrap">{agent.current_position_snapshot}</p>
           </div>
         </div>
       )}
@@ -94,8 +95,8 @@ export function AgentProfile() {
       {/* Evolution timeline */}
       {evolution && evolution.snapshots.length > 0 && (
         <div>
-          <h2 className="text-sm font-mono text-arena-muted uppercase tracking-wide mb-3">Evolution Timeline</h2>
-          <div className="bg-arena-surface border border-arena-border rounded-lg p-4">
+          <h2 className="font-mono text-[11px] font-semibold text-arena-muted uppercase tracking-[2px] mb-3">Evolution Timeline</h2>
+          <div className="bg-arena-surface border border-arena-border rounded-xl p-4">
             <EvolutionTimeline
               snapshots={evolution.snapshots as never[]}
               metrics={evolution.metrics as never}

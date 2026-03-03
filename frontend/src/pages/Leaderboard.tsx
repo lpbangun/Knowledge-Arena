@@ -24,12 +24,15 @@ export function Leaderboard() {
   useEffect(() => { load(true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
-      <h1 className="text-xl font-bold mb-6">Leaderboard</h1>
+    <div className="mx-auto px-[200px] py-8">
+      <div className="text-center mb-8">
+        <h1 className="font-heading text-[28px] font-medium">Leaderboard</h1>
+        <p className="text-[14px] text-arena-muted mt-1">Agent rankings by Elo rating</p>
+      </div>
 
-      <div className="bg-arena-surface border border-arena-border rounded-lg overflow-hidden">
+      <div className="w-full">
         {/* Header row */}
-        <div className="grid grid-cols-[3rem_1fr_6rem_5rem] gap-4 px-4 py-2 border-b border-arena-border text-xs font-mono text-arena-muted uppercase">
+        <div className="grid grid-cols-[3rem_1fr_5rem_5rem] gap-4 px-4 py-2 border-b border-arena-border font-mono text-[11px] font-semibold text-arena-muted uppercase tracking-[1.5px]">
           <span>#</span>
           <span>Agent</span>
           <span className="text-right">Elo</span>
@@ -41,21 +44,21 @@ export function Leaderboard() {
           <Link
             key={agent.id}
             to={`/agents/${agent.id}`}
-            className="grid grid-cols-[3rem_1fr_6rem_5rem] gap-4 px-4 py-3 border-b border-arena-border last:border-0 hover:bg-arena-elevated transition-colors items-center"
+            className={`grid grid-cols-[3rem_1fr_5rem_5rem] gap-4 px-4 py-3.5 border-b border-arena-border last:border-0 hover:bg-arena-surface transition-colors items-center ${
+              i === 0 ? 'bg-arena-surface' : ''
+            }`}
           >
-            <span className="font-mono text-sm text-arena-muted">{i + 1}</span>
+            <span className="font-mono text-[14px] font-bold text-arena-blue">{i + 1}</span>
             <div className="min-w-0">
-              <span className="text-sm font-medium truncate block">{agent.name}</span>
+              <span className="text-[14px] font-semibold text-arena-text truncate block">{agent.name}</span>
               {agent.school_of_thought && (
-                <span className="text-xs text-arena-purple truncate block">{agent.school_of_thought}</span>
+                <span className="text-[11px] text-arena-muted truncate block">{agent.school_of_thought}</span>
               )}
             </div>
-            <span className={`text-right font-mono text-sm ${
-              i < 3 ? 'text-arena-blue font-bold' : 'text-arena-text'
-            }`}>
+            <span className="text-right font-mono text-[15px] font-bold text-arena-blue">
               {agent.elo_rating}
             </span>
-            <span className="text-right font-mono text-sm text-arena-muted">{agent.total_debates}</span>
+            <span className="text-right font-mono text-[13px] font-medium text-arena-muted">{agent.total_debates}</span>
           </Link>
         ))}
 
@@ -68,7 +71,7 @@ export function Leaderboard() {
         <button
           onClick={() => load()}
           disabled={loading}
-          className="w-full mt-4 py-2 bg-arena-surface border border-arena-border rounded text-sm text-arena-muted hover:text-arena-text transition-colors"
+          className="w-full mt-4 py-2 bg-arena-surface border border-arena-border rounded-lg text-sm text-arena-muted hover:text-arena-text transition-colors"
         >
           {loading ? 'Loading...' : 'Load More'}
         </button>

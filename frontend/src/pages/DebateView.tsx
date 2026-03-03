@@ -67,9 +67,9 @@ export function DebateView() {
   });
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-6">
+    <div>
       {/* Header */}
-      <div className="mb-6">
+      <div className="bg-arena-surface border-b border-arena-border py-6 px-12 mb-6">
         <div className="flex items-center gap-3 mb-2">
           <span className={`px-2 py-0.5 rounded text-xs font-mono ${
             debate.status === 'active' ? 'bg-arena-green/20 text-arena-green'
@@ -78,27 +78,32 @@ export function DebateView() {
           }`}>
             {debate.status}
           </span>
-          {connected && <span className="w-2 h-2 rounded-full bg-arena-green" title="Live" />}
+          {connected && (
+            <>
+              <span className="w-2 h-2 rounded-full bg-arena-green" />
+              <span className="text-xs text-arena-green font-medium">Live</span>
+            </>
+          )}
           <span className="text-xs text-arena-muted font-mono">
-            Round {debate.current_round}/{debate.max_rounds}
+            Round {debate.current_round} of {debate.max_rounds}
           </span>
         </div>
-        <h1 className="text-xl font-bold">{debate.topic}</h1>
-        {debate.description && <p className="text-sm text-arena-muted mt-1">{debate.description}</p>}
+        <h1 className="font-heading text-[28px] font-medium max-w-[800px]">{debate.topic}</h1>
+        {debate.description && <p className="text-[14px] text-arena-muted mt-1 max-w-[800px]">{debate.description}</p>}
       </div>
 
-      {/* Content grid */}
-      <div className="grid lg:grid-cols-3 gap-6">
+      {/* Content area */}
+      <div className="flex gap-8 px-12">
         {/* Turns column */}
-        <div className="lg:col-span-2 space-y-4">
+        <div className="flex-1 space-y-4">
           {Array.from(roundGroups.entries())
             .sort(([a], [b]) => a - b)
             .map(([round, roundTurns]) => (
               <div key={round}>
-                <h3 className="text-xs font-mono text-arena-muted uppercase mb-2">Round {round}</h3>
+                <h3 className="font-mono text-[11px] font-semibold text-arena-muted uppercase tracking-[2px] mb-2">Round {round}</h3>
                 <div className="space-y-3">
-                  {roundTurns.map((turn) => (
-                    <TurnCard key={turn.id} turn={turn} />
+                  {roundTurns.map((turn, i) => (
+                    <TurnCard key={turn.id} turn={turn} agentIndex={i} />
                   ))}
                 </div>
               </div>
@@ -110,30 +115,31 @@ export function DebateView() {
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-6">
+        <div className="w-[380px] shrink-0 space-y-4">
           {/* Lakatos structure */}
           {structures.length > 0 && <LakatosMap structures={structures} />}
 
-          {/* Comments toggle */}
-          <div>
-            <button
-              onClick={() => setShowComments(!showComments)}
-              className="text-sm text-arena-blue hover:underline"
-            >
-              {showComments ? 'Hide' : 'Show'} Comments ({comments.length})
-            </button>
-            {showComments && <CommentThread comments={comments} />}
-          </div>
-
           {/* Convergence signals */}
           {debate.convergence_signals && (
-            <div className="bg-arena-elevated border border-arena-purple/30 rounded-lg p-3">
-              <h3 className="text-xs font-mono text-arena-purple uppercase mb-2">Convergence Signals</h3>
+            <div className="bg-arena-surface border border-arena-purple rounded-xl p-4">
+              <h3 className="font-mono text-[11px] font-semibold text-arena-purple uppercase tracking-[2px] mb-2">Convergence Signals</h3>
               <pre className="text-xs text-arena-muted font-mono whitespace-pre-wrap">
                 {JSON.stringify(debate.convergence_signals, null, 2)}
               </pre>
             </div>
           )}
+
+          {/* Comments */}
+          <div
+            onClick={() => setShowComments(!showComments)}
+            className="bg-arena-surface border border-arena-border rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-arena-blue/30 transition-colors"
+          >
+            <span className="text-sm font-medium text-arena-text">Comments</span>
+            <span className="bg-arena-elevated rounded-full px-2.5 py-0.5 text-xs font-mono text-arena-muted">
+              {comments.length}
+            </span>
+          </div>
+          {showComments && <CommentThread comments={comments} />}
         </div>
       </div>
     </div>

@@ -35,7 +35,7 @@ export function Login() {
 
   return (
     <div className="max-w-sm mx-auto px-4 py-16">
-      <h1 className="text-xl font-bold text-center mb-8">
+      <h1 className="font-heading text-[28px] font-medium text-center mb-8">
         {mode === 'login' ? 'Sign In' : 'Create Account'}
       </h1>
 
@@ -47,7 +47,7 @@ export function Login() {
               type="text"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              className="w-full px-3 py-2 bg-arena-surface border border-arena-border rounded text-sm focus:border-arena-blue focus:outline-none"
+              className="w-full px-3 py-2 bg-white border border-arena-border rounded text-sm focus:border-arena-blue focus:outline-none"
               required
             />
           </div>
@@ -58,7 +58,7 @@ export function Login() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full px-3 py-2 bg-arena-surface border border-arena-border rounded text-sm focus:border-arena-blue focus:outline-none"
+            className="w-full px-3 py-2 bg-white border border-arena-border rounded text-sm focus:border-arena-blue focus:outline-none"
             required
           />
         </div>
@@ -68,7 +68,7 @@ export function Login() {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 bg-arena-surface border border-arena-border rounded text-sm focus:border-arena-blue focus:outline-none"
+            className="w-full px-3 py-2 bg-white border border-arena-border rounded text-sm focus:border-arena-blue focus:outline-none"
             required
           />
         </div>
@@ -78,7 +78,7 @@ export function Login() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2 bg-arena-blue text-arena-bg rounded font-medium hover:opacity-90 transition disabled:opacity-50"
+          className="w-full py-2 bg-arena-blue text-white rounded-lg font-medium hover:opacity-90 transition disabled:opacity-50"
         >
           {loading ? 'Loading...' : mode === 'login' ? 'Sign In' : 'Register'}
         </button>

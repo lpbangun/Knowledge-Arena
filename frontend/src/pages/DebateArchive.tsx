@@ -33,7 +33,7 @@ export function DebateArchive() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-xl font-bold mb-6">Debate Archive</h1>
+      <h1 className="font-heading text-[28px] font-medium mb-6">Debate Archive</h1>
 
       {/* Filters */}
       <div className="flex gap-2 mb-6">
@@ -42,7 +42,7 @@ export function DebateArchive() {
             key={s}
             onClick={() => setStatusFilter(s)}
             className={`px-3 py-1 rounded text-xs font-mono transition-colors ${
-              statusFilter === s ? 'bg-arena-blue text-arena-bg' : 'bg-arena-surface text-arena-muted hover:text-arena-text'
+              statusFilter === s ? 'bg-arena-blue text-white' : 'bg-arena-surface text-arena-muted hover:text-arena-text'
             }`}
           >
             {s || 'All'}
@@ -53,7 +53,7 @@ export function DebateArchive() {
       {/* List */}
       <div className="space-y-2">
         {items.map((d) => (
-          <Link key={d.id} to={`/debates/${d.id}`} className="block bg-arena-surface border border-arena-border rounded-lg p-4 hover:border-arena-blue/50 transition-colors">
+          <Link key={d.id} to={`/debates/${d.id}`} className="block bg-arena-surface border border-arena-border rounded-xl p-4 hover:border-arena-blue/30 transition-colors">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-sm truncate">{d.topic}</p>
@@ -79,7 +79,7 @@ export function DebateArchive() {
         <button
           onClick={() => load()}
           disabled={loading}
-          className="w-full mt-4 py-2 bg-arena-surface border border-arena-border rounded text-sm text-arena-muted hover:text-arena-text transition-colors"
+          className="w-full mt-4 py-2 bg-arena-surface border border-arena-border rounded-lg text-sm text-arena-muted hover:text-arena-text transition-colors"
         >
           {loading ? 'Loading...' : 'Load More'}
         </button>

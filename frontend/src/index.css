@@ -1,19 +1,19 @@
 @import "tailwindcss";
 
 @theme {
-  --color-arena-bg: #0D1117;
-  --color-arena-surface: #161B22;
-  --color-arena-elevated: #1C2333;
-  --color-arena-tooltip: #242D3A;
-  --color-arena-border: #30363D;
-  --color-arena-text: #E6EDF3;
-  --color-arena-muted: #8B949E;
-  --color-arena-blue: #58A6FF;
-  --color-arena-orange: #F78166;
-  --color-arena-green: #3FB950;
-  --color-arena-red: #F85149;
-  --color-arena-purple: #BC8CFF;
-  --color-arena-teal: #39D2C0;
+  --color-arena-bg: #FAFAFA;
+  --color-arena-surface: #FFFFFF;
+  --color-arena-elevated: #F5F5F5;
+  --color-arena-border: #E5E5E5;
+  --color-arena-text: #1A1A1A;
+  --color-arena-muted: #888888;
+  --color-arena-blue: #0D6E6E;
+  --color-arena-orange: #E07B54;
+  --color-arena-green: #2D8A4E;
+  --color-arena-red: #D94F4F;
+  --color-arena-purple: #7C6BAF;
+  --color-arena-teal: #0D6E6E;
+  --color-arena-secondary: #E07B54;
 
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -27,18 +27,22 @@
     font-family: var(--font-sans);
     min-height: 100vh;
   }
+
+  .font-heading {
+    font-family: 'Newsreader', Georgia, serif;
+  }
 }
 
 /* Toulmin tag highlight classes */
-.toulmin-claim { background-color: rgba(88, 166, 255, 0.15); border-bottom: 2px solid #58A6FF; }
-.toulmin-data { background-color: rgba(63, 185, 80, 0.15); border-bottom: 2px solid #3FB950; }
-.toulmin-warrant { background-color: rgba(188, 140, 255, 0.15); border-bottom: 2px solid #BC8CFF; }
-.toulmin-backing { background-color: rgba(57, 210, 192, 0.15); border-bottom: 2px solid #39D2C0; }
-.toulmin-qualifier { background-color: rgba(247, 129, 102, 0.15); border-bottom: 2px solid #F78166; }
-.toulmin-rebuttal { background-color: rgba(248, 81, 73, 0.15); border-bottom: 2px solid #F85149; }
+.toulmin-claim { background-color: rgba(13, 110, 110, 0.15); border-bottom: 2px solid #0D6E6E; }
+.toulmin-data { background-color: rgba(45, 138, 78, 0.15); border-bottom: 2px solid #2D8A4E; }
+.toulmin-warrant { background-color: rgba(124, 107, 175, 0.15); border-bottom: 2px solid #7C6BAF; }
+.toulmin-backing { background-color: rgba(13, 110, 110, 0.15); border-bottom: 2px solid #0D6E6E; }
+.toulmin-qualifier { background-color: rgba(224, 123, 84, 0.15); border-bottom: 2px solid #E07B54; }
+.toulmin-rebuttal { background-color: rgba(217, 79, 79, 0.15); border-bottom: 2px solid #D94F4F; }
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 8px; }
-::-webkit-scrollbar-track { background: var(--color-arena-bg); }
-::-webkit-scrollbar-thumb { background: var(--color-arena-border); border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: var(--color-arena-muted); }
+::-webkit-scrollbar-track { background: #FAFAFA; }
+::-webkit-scrollbar-thumb { background: #E5E5E5; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #888888; }

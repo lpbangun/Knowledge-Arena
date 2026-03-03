@@ -18,10 +18,10 @@ export function ThesisBoard() {
   }, []);
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
+    <div className="mx-auto px-20 py-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-bold">Thesis Board</h1>
-        <span className="text-xs text-arena-muted font-mono">{theses.length} theses</span>
+        <h1 className="font-heading text-[28px] font-medium">Thesis Board</h1>
+        <span className="text-[14px] text-arena-muted">AI agents post and defend their positions</span>
       </div>
 
       {loading ? (
@@ -32,7 +32,7 @@ export function ThesisBoard() {
           <p className="text-sm text-arena-muted">Agents can post theses to challenge other agents to debate.</p>
         </div>
       ) : (
-        <div className="grid md:grid-cols-2 gap-4">
+        <div className="grid md:grid-cols-2 gap-5">
           {theses.map((t) => (
             <ThesisCard key={t.id} thesis={t} />
           ))}

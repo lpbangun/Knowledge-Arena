@@ -3,23 +3,23 @@ import cytoscape from 'cytoscape';
 import type { GraphNode, GraphEdge } from '../lib/types';
 
 const NODE_COLORS: Record<string, string> = {
-  hard_core: '#58A6FF',
-  auxiliary: '#BC8CFF',
-  empirical_claim: '#3FB950',
-  evidence: '#39D2C0',
-  synthesis: '#BC8CFF',
-  open_question: '#F78166',
+  hard_core: '#0D6E6E',
+  auxiliary: '#7C6BAF',
+  empirical_claim: '#2D8A4E',
+  evidence: '#0D6E6E',
+  synthesis: '#7C6BAF',
+  open_question: '#E07B54',
 };
 
 const EDGE_COLORS: Record<string, string> = {
-  SUPPORTS: '#3FB950',
-  CONTRADICTS: '#F85149',
-  FALSIFIES: '#F85149',
-  QUALIFIES: '#F78166',
-  EXTENDS: '#58A6FF',
-  SYNTHESIZES: '#BC8CFF',
-  CHALLENGES: '#F78166',
-  EVOLVED_FROM: '#BC8CFF',
+  SUPPORTS: '#2D8A4E',
+  CONTRADICTS: '#D94F4F',
+  FALSIFIES: '#D94F4F',
+  QUALIFIES: '#E07B54',
+  EXTENDS: '#0D6E6E',
+  SYNTHESIZES: '#7C6BAF',
+  CHALLENGES: '#E07B54',
+  EVOLVED_FROM: '#7C6BAF',
 };
 
 interface Props {
@@ -51,10 +51,10 @@ export function GraphViewer({ nodes, edges }: Props) {
           style: {
             label: 'data(label)',
             'font-size': '10px',
-            color: '#E6EDF3',
+            color: '#1A1A1A',
             'text-valign': 'bottom',
             'text-margin-y': 4,
-            'background-color': '#58A6FF',
+            'background-color': '#0D6E6E',
             width: 24,
             height: 24,
           },
@@ -71,8 +71,8 @@ export function GraphViewer({ nodes, edges }: Props) {
             'target-arrow-shape': 'triangle',
             'arrow-scale': 0.8,
             width: 1.5,
-            'line-color': '#30363D',
-            'target-arrow-color': '#30363D',
+            'line-color': '#E5E5E5',
+            'target-arrow-color': '#E5E5E5',
           } as cytoscape.Css.Edge,
         },
         ...Object.entries(EDGE_COLORS).map(([type, color]) => ({
@@ -102,7 +102,7 @@ export function GraphViewer({ nodes, edges }: Props) {
 
       {/* Detail panel */}
       {selected && (
-        <div className="absolute top-4 right-4 w-72 bg-arena-elevated border border-arena-border rounded-lg p-4 shadow-lg">
+        <div className="absolute top-4 right-4 w-72 bg-arena-surface border border-arena-border rounded-xl p-4 shadow-lg">
           <div className="flex justify-between items-start mb-2">
             <h4 className="font-semibold text-sm">{selected.content}</h4>
             <button onClick={() => setSelected(null)} className="text-arena-muted hover:text-arena-text">
@@ -111,8 +111,8 @@ export function GraphViewer({ nodes, edges }: Props) {
           </div>
           <p className="text-sm text-arena-muted mb-2">{selected.content}</p>
           <div className="flex gap-2 text-xs font-mono text-arena-muted">
-            <span className="px-1 bg-arena-surface rounded">{selected.node_type}</span>
-            <span className="px-1 bg-arena-surface rounded">{selected.verification_status}</span>
+            <span className="px-1 bg-arena-elevated rounded">{selected.node_type}</span>
+            <span className="px-1 bg-arena-elevated rounded">{selected.verification_status}</span>
           </div>
         </div>
       )}
