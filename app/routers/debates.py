@@ -361,31 +361,48 @@ async def submit_turn(
     import logging
     _logger = logging.getLogger(__name__)
 
-    # Try Celery dispatch; fall back to inline async validation
-    celery_ok = False
-    try:
-        if debate.status == DebateStatus.PHASE_0 and data.turn_type in ("phase_0_declaration", "phase_0_negotiation"):
-            validate_phase0_declaration.delay(str(turn.id), str(debate_id))
-        else:
-            validate_turn.delay(str(turn.id), str(debate_id))
-        celery_ok = True
-    except Exception as e:
-        _logger.warning(f"Celery unavailable, using inline validation: {e}")
+    if settings.AUTO_VALIDATE_TURNS:
+        # Auto-validate: skip arbiter, mark turn as VALID immediately
+        turn.validation_status = TurnValidationStatus.VALID
+        await db.flush()
+        _logger.info(f"Auto-validated turn {turn.id}")
 
-    if not celery_ok:
-        # Inline validation fallback — validate synchronously in-process
+        # Run protocol logic inline for Phase 0 turns
+        if debate.status == DebateStatus.PHASE_0 and data.turn_type in ("phase_0_declaration", "phase_0_negotiation"):
+            from app.services.protocol import process_phase0_turn
+            p0_result = await process_phase0_turn(db, debate_id, agent.id, turn)
+            _logger.info(f"Phase 0 result: {p0_result}")
+            await db.commit()
+        elif debate.status == DebateStatus.ACTIVE:
+            from app.services.protocol import check_round_complete, advance_round
+            if await check_round_complete(db, debate_id):
+                await advance_round(db, debate_id)
+                await db.commit()
+    else:
+        # Try Celery dispatch; fall back to inline async validation
+        celery_ok = False
         try:
-            from app.tasks.arbiter_tasks import (
-                _validate_turn_async, _validate_phase0_async,
-            )
-            import asyncio
             if debate.status == DebateStatus.PHASE_0 and data.turn_type in ("phase_0_declaration", "phase_0_negotiation"):
-                # Run in background task so we don't block the response
-                asyncio.create_task(_validate_phase0_async(str(turn.id), str(debate_id)))
+                validate_phase0_declaration.delay(str(turn.id), str(debate_id))
             else:
-                asyncio.create_task(_validate_turn_async(str(turn.id), str(debate_id)))
+                validate_turn.delay(str(turn.id), str(debate_id))
+            celery_ok = True
         except Exception as e:
-            _logger.error(f"Inline validation dispatch also failed: {e}")
+            _logger.warning(f"Celery unavailable, using inline validation: {e}")
+
+        if not celery_ok:
+            # Inline validation fallback
+            try:
+                from app.tasks.arbiter_tasks import (
+                    _validate_turn_async, _validate_phase0_async,
+                )
+                import asyncio
+                if debate.status == DebateStatus.PHASE_0 and data.turn_type in ("phase_0_declaration", "phase_0_negotiation"):
+                    asyncio.create_task(_validate_phase0_async(str(turn.id), str(debate_id)))
+                else:
+                    asyncio.create_task(_validate_turn_async(str(turn.id), str(debate_id)))
+            except Exception as e:
+                _logger.error(f"Inline validation dispatch also failed: {e}")
 
     try:
         await ws_manager.publish_event(str(debate_id), "turn_submitted", {
