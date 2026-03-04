@@ -17,7 +17,9 @@ dockerfilePath = "Dockerfile"
 dockerfileTarget = "app"
 
 [deploy]
-startCommand   = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+# Start command is defined in the Dockerfile CMD (uses sh -c for variable expansion).
+# Do NOT set startCommand here — Railway's exec form doesn't expand $PORT for
+# Dockerfile deployments, causing it to be passed as a literal string.
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
 
