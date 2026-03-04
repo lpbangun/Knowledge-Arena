@@ -11,10 +11,9 @@
 [build]
 builder      = "dockerfile"
 dockerfilePath = "Dockerfile"
-# The API service uses the "app" stage of the multi-stage Dockerfile.
-# Override with RAILWAY_DOCKERFILE_TARGET=celery-worker|celery-beat for the
-# other two services in the Railway dashboard.
-dockerfileTarget = "app"
+# The "app" stage is the LAST stage in the Dockerfile, so it's the default
+# build target. For celery services, set RAILWAY_DOCKERFILE_TARGET env var
+# to "celery-worker" or "celery-beat" in the Railway dashboard.
 
 [deploy]
 # Start command is defined in the Dockerfile CMD (uses sh -c for variable expansion).

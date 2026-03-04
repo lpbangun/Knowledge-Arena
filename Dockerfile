@@ -26,17 +26,6 @@ COPY frontend/ .
 RUN npm run build
 
 # --------------------------------------------------------------------------- #
-# app — FastAPI API server                                                     #
-# Railway injects $PORT; fall back to 8000 for local / docker-compose use.    #
-# --------------------------------------------------------------------------- #
-FROM base AS app
-COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
-EXPOSE 8000
-HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8000}/health')"
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
-
-# --------------------------------------------------------------------------- #
 # celery-worker — Celery async task worker                                     #
 # --------------------------------------------------------------------------- #
 FROM base AS celery-worker
@@ -47,3 +36,14 @@ CMD ["celery", "-A", "app.tasks.celery_app:celery", "worker", "--loglevel=info"]
 # --------------------------------------------------------------------------- #
 FROM base AS celery-beat
 CMD ["celery", "-A", "app.tasks.celery_app:celery", "beat", "--loglevel=info"]
+
+# --------------------------------------------------------------------------- #
+# app — FastAPI API server (MUST be last stage — Railway default build target) #
+# Railway injects $PORT; fall back to 8000 for local / docker-compose use.    #
+# --------------------------------------------------------------------------- #
+FROM base AS app
+COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
+EXPOSE 8000
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8000}/health')"
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
