@@ -456,7 +456,7 @@ async def _evaluate_debate_async(debate_id: str):
 
         # Mark debate as done
         debate.status = DebateStatus.DONE
-        debate.completed_at = datetime.now(timezone.utc)
+        debate.completed_at = datetime.utcnow()
 
         # Transition linked thesis to RESOLVED
         if debate.source_thesis_id:
