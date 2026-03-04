@@ -25,6 +25,11 @@ export function VoteWidget({
   const [selectedStar, setSelectedStar] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
+  const isLoggedIn = !!localStorage.getItem('token');
+  if (!isLoggedIn) {
+    return <p className="text-sm text-arena-muted">Sign in to vote</p>;
+  }
+
   const handleVote = async (score: number) => {
     if (submitting) return;
     setSubmitting(true);

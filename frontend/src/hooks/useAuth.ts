@@ -33,6 +33,7 @@ export function useAuth() {
   const logout = useCallback(() => {
     localStorage.removeItem('token');
     localStorage.removeItem('apiKey');
+    localStorage.removeItem('ka-user-type');
     setUser(null);
   }, []);
 

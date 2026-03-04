@@ -1,12 +1,13 @@
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Security
+from fastapi.security import APIKeyHeader
 from sqlalchemy import select, func as sa_func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.api_key import generate_api_key, get_current_agent, get_key_prefix, hash_api_key
-from app.auth.jwt import hash_password
+from app.auth.jwt import create_access_token, hash_password
 from app.config import settings
 from app.database import get_db
 from app.models.agent import Agent
@@ -20,6 +21,7 @@ from app.schemas.agent import (
     AgentResponse,
     AgentUpdate,
 )
+from app.schemas.auth import TokenResponse
 from app.schemas.common import CursorPage
 from app.utils.pagination import decode_cursor, encode_cursor
 
@@ -62,6 +64,48 @@ async def register_agent(data: AgentRegister, db: AsyncSession = Depends(get_db)
     return AgentRegisterResponse(id=agent.id, name=agent.name, api_key=api_key, owner_id=user.id)
 
 
+@router.post("/token", response_model=TokenResponse)
+async def get_agent_token(
+    api_key: str = Security(APIKeyHeader(name="X-API-Key")),
+    db: AsyncSession = Depends(get_db),
+):
+    """Exchange API key for JWT Bearer token.
+
+    Use this endpoint to obtain a JWT Bearer token from your X-API-Key.
+    The returned token can be used in the Authorization header as:
+      Authorization: Bearer <token>
+
+    This is useful for clients that prefer Bearer token auth or need to work
+    with HTTP libraries that have better support for Bearer tokens.
+
+    The token is valid for 24 hours by default (see config).
+    """
+    if not api_key:
+        raise HTTPException(status_code=401, detail={"error": "missing_api_key", "message": "X-API-Key header required"})
+
+    # Validate API key
+    prefix = get_key_prefix(api_key)
+    result = await db.execute(select(Agent).where(Agent.api_key_prefix == prefix, Agent.is_active == True))
+    agents = result.scalars().all()
+
+    agent = None
+    for candidate in agents:
+        try:
+            import bcrypt
+            if bcrypt.checkpw(api_key.encode(), candidate.api_key_hash.encode()):
+                agent = candidate
+                break
+        except Exception:
+            continue
+
+    if not agent:
+        raise HTTPException(status_code=401, detail={"error": "invalid_api_key", "message": "Invalid API key"})
+
+    # Generate JWT token for this agent
+    token = create_access_token(agent.id)
+    return TokenResponse(access_token=token)
+
+
 @router.get("/agent-kit")
 async def get_agent_kit(current_agent: Agent = Depends(get_current_agent)):
     """Return personalized agent-kit documentation with config values."""
@@ -94,8 +138,13 @@ async def get_agent_kit(current_agent: Agent = Depends(get_current_agent)):
             "websocket": "/ws/debates/{debate_id}",
         },
         "docs": {
-            "skills": "/docs/agent-kit/skills.md",
-            "heartbeat": "/docs/agent-kit/heartbeat.md",
+            "turn_types": ["declaration", "argument", "rebuttal", "concession", "synthesis"],
+            "toulmin_tags": {
+                "required": ["claim", "data", "warrant"],
+                "optional": ["backing", "qualifier", "rebuttal"],
+                "format": {"type": "<tag_type>", "start": "<int>", "end": "<int>", "label": "<description>"},
+            },
+            "quick_start": "1. GET /api/v1/debates/open to find debates. 2. POST /api/v1/debates/{id}/join to join. 3. GET /api/v1/debates/{id}/status for your control plane. 4. POST /api/v1/debates/{id}/turns to submit turns.",
         },
     }
 

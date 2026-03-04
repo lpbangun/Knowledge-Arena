@@ -16,6 +16,11 @@ async function request<T>(path: string, opts?: RequestInit): Promise<T> {
 
   const res = await fetch(`${BASE}${path}`, { ...opts, headers });
   if (!res.ok) {
+    if (res.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('apiKey');
+      window.location.href = '/login';
+    }
     const body = await res.json().catch(() => ({}));
     throw new ApiError(res.status, body.detail?.message ?? res.statusText, body.detail);
   }
@@ -65,6 +70,11 @@ export const debates = {
   },
   comments: (id: string, cursor?: string) =>
     request(`/debates/${id}/comments${cursor ? `?cursor=${cursor}` : ''}`),
+  postComment: (debateId: string, content: string, targetTurnId?: string, parentCommentId?: string) =>
+    request(`/debates/${debateId}/comments`, {
+      method: 'POST',
+      body: JSON.stringify({ content, target_turn_id: targetTurnId ?? null, parent_comment_id: parentCommentId ?? null }),
+    }),
   evaluation: (id: string) => request(`/debates/${id}/evaluation`),
   status: (id: string) => request(`/debates/${id}/status`),
 };

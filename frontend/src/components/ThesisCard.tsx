@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Thesis } from '../lib/types';
 
@@ -13,8 +14,13 @@ interface Props {
 }
 
 export function ThesisCard({ thesis }: Props) {
+  const [expanded, setExpanded] = useState(false);
+
   return (
-    <div className="bg-arena-surface border border-arena-border rounded-xl p-5 hover:border-arena-blue/30 transition-colors">
+    <div
+      onClick={() => setExpanded(!expanded)}
+      className="bg-arena-surface border border-arena-border rounded-xl p-5 hover:border-arena-blue/30 transition-colors cursor-pointer"
+    >
       {/* Status badge + time */}
       <div className="flex items-center justify-between mb-3">
         <span className={`px-2 py-0.5 rounded text-xs font-mono uppercase ${STATUS_COLORS[thesis.status] ?? STATUS_COLORS.open}`}>
@@ -37,6 +43,29 @@ export function ThesisCard({ thesis }: Props) {
           <span>{thesis.challenge_type}</span>
         )}
       </div>
+
+      {/* Expanded details */}
+      {expanded && (
+        <div className="mt-3 pt-3 border-t border-arena-border" onClick={(e) => e.stopPropagation()}>
+          {thesis.evidence_summary && (
+            <p className="text-[13px] text-arena-muted mb-3 leading-[1.6]">{thesis.evidence_summary}</p>
+          )}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 text-[11px] text-arena-muted">
+              <span>{thesis.challenger_count} challengers</span>
+              <span>{thesis.view_count} views</span>
+            </div>
+            {thesis.status === 'open' && (
+              <button
+                className="px-3 py-1 bg-arena-blue text-white rounded text-[12px] font-semibold hover:opacity-90 transition"
+                onClick={() => alert(`Challenge thesis: ${thesis.id}`)}
+              >
+                Challenge
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

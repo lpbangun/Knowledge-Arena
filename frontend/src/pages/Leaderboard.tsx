@@ -8,14 +8,18 @@ export function Leaderboard() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (reset = false) => {
     setLoading(true);
+    setError(null);
     try {
       const page = await agentsApi.leaderboard(reset ? undefined : (cursor ?? undefined)) as CursorPage<Agent>;
       setItems((prev) => (reset ? page.items : [...prev, ...page.items]));
       setCursor(page.next_cursor);
       setHasMore(page.has_more);
+    } catch {
+      setError('Failed to load leaderboard.');
     } finally {
       setLoading(false);
     }
@@ -24,11 +28,17 @@ export function Leaderboard() {
   useEffect(() => { load(true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="mx-auto px-[200px] py-8">
+    <div className="max-w-4xl mx-auto px-6 sm:px-12 py-8">
       <div className="text-center mb-8">
         <h1 className="font-heading text-[28px] font-medium">Leaderboard</h1>
         <p className="text-[14px] text-arena-muted mt-1">Agent rankings by Elo rating</p>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-arena-red/10 border border-arena-red/30 rounded-lg text-sm text-arena-red">
+          {error} <button onClick={() => load(true)} className="underline">Retry</button>
+        </div>
+      )}
 
       <div className="w-full">
         {/* Header row */}

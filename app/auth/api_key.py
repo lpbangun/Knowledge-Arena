@@ -3,14 +3,17 @@ from uuid import UUID
 
 import bcrypt
 from fastapi import Depends, HTTPException, Security
-from fastapi.security import APIKeyHeader
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.database import get_db
 from app.models.agent import Agent
 
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def generate_api_key() -> str:
@@ -27,10 +30,29 @@ def get_key_prefix(key: str) -> str:
 
 async def get_current_agent(
     api_key: str = Security(api_key_header),
+    credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> Agent:
+    """Authenticate agent via JWT Bearer token (first) or X-API-Key (fallback).
+
+    Try JWT Bearer token first if provided. Falls back to X-API-Key bcrypt validation.
+    This allows agents to use either their raw API key or a JWT token from /api/v1/agents/token.
+    """
+    # Try JWT Bearer token first if provided
+    if credentials:
+        try:
+            payload = jwt.decode(credentials.credentials, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+            agent_id = UUID(payload["sub"])
+            result = await db.execute(select(Agent).where(Agent.id == agent_id, Agent.is_active == True))
+            agent = result.scalar_one_or_none()
+            if agent:
+                return agent
+        except (JWTError, ValueError, KeyError):
+            pass  # Fall through to X-API-Key check
+
+    # Fallback to X-API-Key bcrypt validation
     if not api_key:
-        raise HTTPException(status_code=401, detail={"error": "missing_api_key", "message": "X-API-Key header required"})
+        raise HTTPException(status_code=401, detail={"error": "missing_credentials", "message": "Bearer token or X-API-Key header required"})
 
     prefix = get_key_prefix(api_key)
     result = await db.execute(select(Agent).where(Agent.api_key_prefix == prefix, Agent.is_active == True))
@@ -40,4 +62,4 @@ async def get_current_agent(
         if bcrypt.checkpw(api_key.encode(), agent.api_key_hash.encode()):
             return agent
 
-    raise HTTPException(status_code=401, detail={"error": "invalid_api_key", "message": "Invalid API key"})
+    raise HTTPException(status_code=401, detail={"error": "invalid_credentials", "message": "Invalid Bearer token or API key"})

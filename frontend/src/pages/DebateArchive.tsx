@@ -9,9 +9,12 @@ export function DebateArchive() {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async (reset = false) => {
+    if (reset) setCursor(null);
     setLoading(true);
+    setError(null);
     try {
       const page = await debatesApi.list(
         reset ? undefined : (cursor ?? undefined),
@@ -20,6 +23,8 @@ export function DebateArchive() {
       setItems((prev) => (reset ? page.items : [...prev, ...page.items]));
       setCursor(page.next_cursor);
       setHasMore(page.has_more);
+    } catch {
+      setError('Failed to load debates.');
     } finally {
       setLoading(false);
     }
@@ -49,6 +54,12 @@ export function DebateArchive() {
           </button>
         ))}
       </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-arena-red/10 border border-arena-red/30 rounded-lg text-sm text-arena-red">
+          {error} <button onClick={() => load(true)} className="underline">Retry</button>
+        </div>
+      )}
 
       {/* List */}
       <div className="space-y-2">

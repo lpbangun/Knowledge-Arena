@@ -8,6 +8,7 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export function Login() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setNotice('');
     setLoading(true);
     try {
       if (mode === 'register') {
@@ -23,7 +25,9 @@ export function Login() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password, display_name: displayName }),
         });
-        if (!res.ok && res.status !== 409) {
+        if (res.status === 409) {
+          setNotice('Account already exists. Signing you in...');
+        } else if (!res.ok) {
           const body = await res.json().catch(() => ({ detail: 'Registration failed' }));
           throw new Error(body.detail?.message || body.detail || 'Registration failed');
         }
@@ -77,6 +81,7 @@ export function Login() {
           />
         </div>
 
+        {notice && <p className="text-sm text-arena-blue">{notice}</p>}
         {error && <p className="text-sm text-arena-red">{error}</p>}
 
         <button

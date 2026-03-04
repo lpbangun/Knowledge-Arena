@@ -46,3 +46,7 @@
 ::-webkit-scrollbar-track { background: #FAFAFA; }
 ::-webkit-scrollbar-thumb { background: #E5E5E5; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #888888; }
+
+/* Hide scrollbar utility */
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }

@@ -468,3 +468,56 @@ graph/nodes, graph/edges, graph/convergence, auth/register
 - Frontend rebuilt successfully (tsc + vite build clean)
 
 ---------------------------------------------------------------
+
+═══════════════════════════════════════════════════════════
+[2026-03-04T12:00:00Z] [HOTFIX] [FIX] [ELO RATING PIPELINE]
+═══════════════════════════════════════════════════════════
+
+## Context
+All agents stuck at Elo 1000 after Railway deployment. Elo calculation function correct (unit tests pass), but pipeline never triggers evaluation.
+
+## Implementation — 7 Fixes Applied
+
+### Fix 1: AUTO_VALIDATE_TURNS=true in .env
+- Turns no longer require Celery + OpenRouter Layer 1 for validation
+- Turns auto-validate → rounds complete → debates finish → evaluation triggers
+
+### Fix 2: Idempotency guard in _evaluate_debate_async
+- File: app/tasks/arbiter_tasks.py
+- Early return if debate already in EVALUATION/SYNTHESIS/DONE
+- Prevents double-evaluation from multiple fallback paths
+
+### Fix 3: flag_modified for elo_history JSONB
+- File: app/tasks/arbiter_tasks.py
+- Added `flag_modified(agent, "elo_history")` after JSONB mutation
+- SQLAlchemy now properly detects the change and persists it
+
+### Fix 4: Inline fallback in protocol.py advance_round()
+- Replaced bare `except: pass` with Celery-first + asyncio.ensure_future fallback
+- Logs warning when Celery unavailable
+
+### Fix 5: Inline fallback in convergence.py
+- Wrapped evaluate_debate.delay() in try/except with same fallback pattern
+- Converged debates now trigger evaluation even without Celery
+
+### Fix 6: Manual evaluation endpoint
+- POST /api/v1/debates/{debate_id}/evaluate
+- Accepts COMPLETED, CONVERGED, or EVALUATION_FAILED debates
+- Tries Celery first, falls back to inline
+
+### Fix 7: Inline evaluation in AUTO_VALIDATE path
+- After advance_round() + commit in submit_turn, checks if debate is COMPLETED
+- If so, fires _evaluate_debate_async inline — no Celery dependency
+
+## Tests
+- All modified files compile cleanly
+- All imports successful
+- Elo calculation sanity checks pass
+- Full test suite requires PostgreSQL (not available locally)
+
+## Decisions Made
+- Used asyncio.ensure_future() for fire-and-forget fallbacks in protocol.py/convergence.py
+- Used direct await in debates.py AUTO_VALIDATE path (request can wait for evaluation)
+- Manual endpoint returns 202 for Celery, 200 for inline completion
+
+───────────────────────────────────────────────────────────

@@ -15,18 +15,27 @@ export function AgentProfile() {
   const [eloHistory, setEloHistory] = useState<EloHistory | null>(null);
   const [evolution, setEvolution] = useState<{ snapshots: unknown[]; metrics?: unknown } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!agentId) return;
     Promise.all([
       agentsApi.get(agentId).then((a) => setAgent(a as Agent)),
-      agentsApi.eloHistory(agentId).then((h) => setEloHistory(h as EloHistory)),
+      agentsApi.eloHistory(agentId).then((h) => setEloHistory(h as EloHistory)).catch(() => {}),
       agentsApi.evolution(agentId).then((e) => setEvolution(e as { snapshots: unknown[]; metrics?: unknown })).catch(() => {}),
-    ]).finally(() => setLoading(false));
+    ]).catch(() => {
+      setError('Failed to load agent profile.');
+    }).finally(() => setLoading(false));
   }, [agentId]);
 
   if (loading) return <div className="max-w-4xl mx-auto px-4 py-8 text-arena-muted">Loading...</div>;
-  if (!agent) return <div className="max-w-4xl mx-auto px-4 py-8 text-arena-red">Agent not found</div>;
+  if (error || !agent) return (
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="p-3 bg-arena-red/10 border border-arena-red/30 rounded-lg text-sm text-arena-red">
+        {error ?? 'Agent not found.'} <button onClick={() => window.location.reload()} className="underline">Retry</button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">

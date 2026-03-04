@@ -35,7 +35,7 @@ from app.schemas.debate import (
     TurnSubmit,
     VoteCreate,
 )
-from app.tasks.arbiter_tasks import validate_turn, validate_phase0_declaration, evaluate_amicus_brief
+from app.tasks.arbiter_tasks import validate_turn, validate_phase0_declaration, evaluate_amicus_brief, evaluate_debate
 from app.utils.pagination import decode_cursor, encode_cursor
 from app.utils.ws_manager import ws_manager
 
@@ -407,6 +407,17 @@ async def submit_turn(
                     await advance_round(db, debate_id)
                     await db.commit()
                     _logger.info(f"Round advanced for debate {debate_id}")
+
+                    # Check if debate reached COMPLETED after advance_round
+                    result3 = await db.execute(select(Debate).where(Debate.id == debate_id))
+                    debate_after = result3.scalar_one()
+                    if debate_after.status == DebateStatus.COMPLETED:
+                        _logger.info(f"Debate {debate_id} completed, triggering inline evaluation")
+                        try:
+                            from app.tasks.arbiter_tasks import _evaluate_debate_async
+                            await _evaluate_debate_async(str(debate_id))
+                        except Exception as eval_err:
+                            _logger.error(f"Inline evaluation failed for {debate_id}: {eval_err}")
                     break
                 if _check_attempt < 2:
                     await _asyncio.sleep(1)
@@ -863,3 +874,42 @@ async def get_evaluation(debate_id: UUID, db: AsyncSession = Depends(get_db)):
             "open_questions": synthesis.open_questions,
         } if synthesis else None,
     }
+
+
+@router.post("/{debate_id}/evaluate", status_code=202)
+async def trigger_evaluation(
+    debate_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Manually trigger evaluation for a COMPLETED or EVALUATION_FAILED debate."""
+    import logging
+    _log = logging.getLogger(__name__)
+
+    result = await db.execute(select(Debate).where(Debate.id == debate_id))
+    debate = result.scalar_one_or_none()
+    if not debate:
+        raise HTTPException(status_code=404, detail={"error": "debate_not_found", "message": f"Debate {debate_id} does not exist"})
+
+    if debate.status not in (DebateStatus.COMPLETED, DebateStatus.EVALUATION_FAILED, DebateStatus.CONVERGED):
+        raise HTTPException(status_code=400, detail={
+            "error": "invalid_status",
+            "message": f"Debate status is {debate.status.value}, must be COMPLETED, CONVERGED, or EVALUATION_FAILED",
+        })
+
+    # Try Celery first, fall back to inline
+    try:
+        evaluate_debate.delay(str(debate_id))
+        return {"status": "queued", "method": "celery"}
+    except Exception as e:
+        _log.warning(f"Celery unavailable for manual evaluate_debate on {debate_id}: {e}")
+
+    try:
+        from app.tasks.arbiter_tasks import _evaluate_debate_async
+        await _evaluate_debate_async(str(debate_id))
+        return {"status": "completed", "method": "inline"}
+    except Exception as e:
+        _log.error(f"Inline evaluation failed for {debate_id}: {e}")
+        raise HTTPException(status_code=500, detail={
+            "error": "evaluation_failed",
+            "message": f"Evaluation failed: {str(e)[:200]}",
+        })

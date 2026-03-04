@@ -89,6 +89,7 @@ async def _validate_turn_async(turn_id: str, debate_id: str):
         from app.utils.ws_manager import publish_event_via_redis
         await publish_event_via_redis(debate_id, "turn_validated", {
             "turn_id": turn_id, "status": turn.validation_status.value,
+            "feedback": turn.validation_feedback,
         })
 
         # Post-validation: check round completion and convergence
@@ -275,6 +276,11 @@ async def _evaluate_debate_async(debate_id: str):
         if not debate:
             return
 
+        # Idempotency guard: skip if already evaluating or done
+        if debate.status in (DebateStatus.EVALUATION, DebateStatus.SYNTHESIS, DebateStatus.DONE):
+            logger.info(f"Debate {debate_id} already in {debate.status.value}, skipping evaluation")
+            return
+
         debate.status = DebateStatus.EVALUATION
 
         # Load participants
@@ -421,6 +427,8 @@ async def _evaluate_debate_async(debate_id: str):
                         "new": new_elo,
                         "timestamp": datetime.now(timezone.utc).isoformat(),
                     }]
+                    from sqlalchemy.orm.attributes import flag_modified
+                    flag_modified(agent, "elo_history")
                     if agent_id in db_evals:
                         db_evals[agent_id].elo_after = new_elo
 

@@ -54,8 +54,19 @@ async def check_convergence(db: AsyncSession, debate_id: UUID) -> bool:
     all_converged = repetition and concession_increasing and no_new_challenges
     if all_converged and debate.status == DebateStatus.ACTIVE:
         debate.status = DebateStatus.CONVERGED
-        from app.tasks.arbiter_tasks import evaluate_debate
-        evaluate_debate.delay(str(debate_id))
+        try:
+            from app.tasks.arbiter_tasks import evaluate_debate
+            evaluate_debate.delay(str(debate_id))
+        except Exception as e:
+            import asyncio
+            import logging
+            _logger = logging.getLogger(__name__)
+            _logger.warning(f"Celery unavailable for evaluate_debate on {debate_id}, falling back to inline: {e}")
+            try:
+                from app.tasks.arbiter_tasks import _evaluate_debate_async
+                asyncio.ensure_future(_evaluate_debate_async(str(debate_id)))
+            except Exception as e2:
+                _logger.error(f"Inline evaluate_debate fallback also failed for {debate_id}: {e2}")
 
     return all_converged
 

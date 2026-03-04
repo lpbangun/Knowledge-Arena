@@ -6,6 +6,8 @@ import type { Debate, CursorPage } from '../lib/types';
 export function Landing() {
   const [recent, setRecent] = useState<Debate[]>([]);
   const [open, setOpen] = useState<Debate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [userType, setUserType] = useState<'human' | 'agent'>(
     () => (localStorage.getItem('ka-user-type') as 'human' | 'agent') || 'human'
   );
@@ -16,12 +18,22 @@ export function Landing() {
   };
 
   useEffect(() => {
-    debatesApi.list(undefined, undefined).then((r) => setRecent((r as CursorPage<Debate>).items.slice(0, 5))).catch(() => {});
-    debatesApi.open().then((r) => setOpen((r as CursorPage<Debate>).items.slice(0, 5))).catch(() => {});
+    setLoading(true);
+    Promise.all([
+      debatesApi.list(undefined, undefined).then((r) => setRecent((r as CursorPage<Debate>).items.slice(0, 5))),
+      debatesApi.open().then((r) => setOpen((r as CursorPage<Debate>).items.slice(0, 5))),
+    ]).catch(() => {
+      setError('Failed to load debates.');
+    }).finally(() => setLoading(false));
   }, []);
 
   return (
     <div>
+      {error && (
+        <div className="mx-6 sm:mx-12 lg:mx-[120px] mb-4 p-3 bg-arena-red/10 border border-arena-red/30 rounded-lg text-sm text-arena-red">
+          Failed to load debates. <button onClick={() => window.location.reload()} className="underline">Retry</button>
+        </div>
+      )}
       {/* Hero */}
       <div className="text-center pt-16 mb-12">
         <h1 className="font-heading text-[56px] font-medium leading-tight">
@@ -88,7 +100,7 @@ export function Landing() {
       </div>
 
       {/* How It Works overview */}
-      <div className="px-[120px] mb-14">
+      <div className="px-6 sm:px-12 lg:px-[120px] mb-14">
         <h2 className="font-mono text-[11px] font-semibold text-arena-muted uppercase tracking-[2px] mb-4 text-center">
           How Knowledge Arena Works
         </h2>
@@ -181,19 +193,21 @@ export function Landing() {
       )}
 
       {/* Content columns */}
-      <div className="grid lg:grid-cols-2 gap-12 px-[120px] pb-16">
+      <div className="grid lg:grid-cols-2 gap-12 px-6 sm:px-12 lg:px-[120px] pb-16">
         {/* Open debates */}
         <div>
           <h2 className="font-mono text-[11px] font-semibold text-arena-muted uppercase tracking-[2px] mb-3">Open Debates</h2>
-          {open.length === 0 ? (
+          {loading ? (
+            <p className="text-sm text-arena-muted">Loading...</p>
+          ) : open.length === 0 ? (
             <p className="text-sm text-arena-muted">No open debates right now.</p>
           ) : (
             <div className="space-y-2">
               {open.map((d) => (
-                <Link key={d.id} to={`/debates/${d.id}`} data-debate-id={d.id} className="block bg-arena-surface border border-arena-border rounded-xl p-4 hover:border-arena-blue/30 transition-colors">
-                  <div className="flex flex-col gap-2">
+                <Link key={d.id} to={`/debates/${d.id}`} data-debate-id={d.id} className="block bg-arena-surface border border-arena-border rounded-xl p-4 hover:border-arena-blue/30 transition-colors overflow-hidden">
+                  <div className="flex flex-col gap-2 min-w-0">
                     <span className="inline-flex self-start bg-[#0D6E6E15] rounded-md px-2 py-0.5 font-mono text-[11px] text-arena-blue">
-                      Phase 0
+                      {d.status === 'phase_0' ? 'Phase 0' : d.status === 'active' ? 'Active' : d.status}
                     </span>
                     <p className="text-[15px] font-semibold text-arena-text truncate">{d.topic}</p>
                     <span className="font-mono text-[12px] font-medium text-arena-muted">
@@ -215,14 +229,14 @@ export function Landing() {
             <div className="space-y-2">
               {recent.map((d) => (
                 <Link key={d.id} to={`/debates/${d.id}`} className="block bg-arena-surface border border-arena-border rounded-xl p-4 hover:border-arena-blue/30 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
                       <p className="text-[14px] font-medium text-arena-text truncate">{d.topic}</p>
                       <span className="font-mono text-[11px] text-arena-muted">
                         Round {d.current_round}/{d.max_rounds} · {d.status.toUpperCase()}
                       </span>
                     </div>
-                    <span className={`px-2 py-0.5 rounded text-[11px] font-mono font-medium ${
+                    <span className={`shrink-0 px-2 py-0.5 rounded text-[11px] font-mono font-medium ${
                       d.status === 'active' ? 'bg-arena-green/15 text-arena-green'
                       : d.status === 'done' ? 'bg-arena-blue/15 text-arena-blue'
                       : 'bg-arena-elevated text-arena-muted'

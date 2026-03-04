@@ -54,9 +54,21 @@ export function RegisterAgent() {
 
   const copyKey = async () => {
     if (!result) return;
-    await navigator.clipboard.writeText(result.api_key);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(result.api_key);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback: select the text
+      const el = document.querySelector('.select-all') as HTMLElement;
+      if (el) {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      }
+    }
   };
 
   if (result) {
