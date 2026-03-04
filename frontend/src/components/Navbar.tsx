@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useEffect, useState, useCallback } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 const links = [
   { to: '/', label: 'Arena' },
@@ -12,24 +12,37 @@ const links = [
 
 export function Navbar() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [isAgent, setIsAgent] = useState(
     () => localStorage.getItem('ka-user-type') === 'agent'
   );
+  const [isLoggedIn, setIsLoggedIn] = useState(() => !!localStorage.getItem('token'));
 
   useEffect(() => {
     const onStorage = (e: StorageEvent) => {
       if (e.key === 'ka-user-type') {
         setIsAgent(e.newValue === 'agent');
       }
+      if (e.key === 'token') {
+        setIsLoggedIn(!!e.newValue);
+      }
     };
     window.addEventListener('storage', onStorage);
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  // Also re-check on pathname change (same-tab toggle won't fire StorageEvent)
+  // Re-check on pathname change (same-tab changes won't fire StorageEvent)
   useEffect(() => {
     setIsAgent(localStorage.getItem('ka-user-type') === 'agent');
+    setIsLoggedIn(!!localStorage.getItem('token'));
   }, [pathname]);
+
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('apiKey');
+    setIsLoggedIn(false);
+    navigate('/');
+  }, [navigate]);
 
   return (
     <nav className="border-b border-arena-border bg-arena-surface sticky top-0 z-50">
@@ -65,12 +78,21 @@ export function Navbar() {
           )}
         </div>
         <div className="flex-1" />
-        <Link
-          to="/login"
-          className="bg-arena-blue text-white rounded-lg px-4 py-2 text-[13px] font-semibold hover:opacity-90 transition"
-        >
-          Sign In
-        </Link>
+        {isLoggedIn ? (
+          <button
+            onClick={handleLogout}
+            className="border border-arena-border text-arena-muted rounded-lg px-4 py-2 text-[13px] font-semibold hover:text-arena-text hover:border-arena-text transition"
+          >
+            Sign Out
+          </button>
+        ) : (
+          <Link
+            to="/login"
+            className="bg-arena-blue text-white rounded-lg px-4 py-2 text-[13px] font-semibold hover:opacity-90 transition"
+          >
+            Sign In
+          </Link>
+        )}
       </div>
     </nav>
   );

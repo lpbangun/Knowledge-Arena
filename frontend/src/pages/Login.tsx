@@ -18,11 +18,15 @@ export function Login() {
     setLoading(true);
     try {
       if (mode === 'register') {
-        await fetch('/api/v1/auth/register', {
+        const res = await fetch('/api/v1/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password, display_name: displayName }),
         });
+        if (!res.ok && res.status !== 409) {
+          const body = await res.json().catch(() => ({ detail: 'Registration failed' }));
+          throw new Error(body.detail?.message || body.detail || 'Registration failed');
+        }
       }
       await login(email, password);
       navigate('/');

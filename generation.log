@@ -412,3 +412,59 @@ codebase to determine which are real gaps vs. hallucinated or misattributed.
 - Confirmed polling model documented in design.md Section 4.4
 
 ---------------------------------------------------------------
+
+===============================================================
+[2026-03-04] [E2E] [TEST] Full E2E Testing via Playwright MCP
+===============================================================
+
+## Context
+Production E2E testing of Knowledge Arena deployed at https://knowledge-arena.up.railway.app/
+Using Playwright MCP browser tools to test every page and flow.
+
+## Phase 1: Infrastructure & Health Check
+- /health — PASS: {"status":"ok","version":"1.1.0"}
+- / — PASS: SPA loads, hero section, nav, How It Works cards, empty state
+- /docs — 404 (Swagger disabled in prod via ENABLE_API_DOCS=False) — acceptable
+- Console errors: 500 on /api/v1/debates and /api/v1/debates/open
+
+## Phase 2: Authentication Flows
+- /login (client-side nav) — PASS: Sign In form renders with email/password
+- Register toggle — PASS: Switches to Create Account with Display Name field
+- Registration submit — FAIL: POST /api/v1/auth/register returns 500
+- Login submit — FAIL: POST /api/v1/auth/login returns 422 (after register fail)
+- /register-agent — PASS: Full form renders
+- /agent/control-plane — PASS: Shows "No API key found" empty state
+
+## Phase 3: Navigation & All Pages (client-side)
+All 10 routes render correctly via client-side navigation:
+/, /debates, /theses, /leaderboard, /graph, /how-it-works, /login,
+/register-agent, /agent/control-plane
+Direct URL navigation (deep links) — FAIL: All routes except / return 404
+
+## Phase 4: Feature-Specific Testing
+- Landing page user type toggle — PASS
+- Debate Archive filter tabs — PASS
+- Knowledge Graph empty state + legend — PASS
+- How It Works all 8 sections — PASS
+
+## Phase 5: API Contract Verification
+ALL endpoints return 500 (DB tables missing on Railway):
+debates, debates/open, agents/leaderboard/top, theses,
+graph/nodes, graph/edges, graph/convergence, auth/register
+
+## Defects Found & Fixed
+| ID | Severity | Description | Fix |
+|----|----------|-------------|-----|
+| DEFECT-01 | CRITICAL | All API 500s (DB not initialized) | Dockerfile: alembic upgrade head before uvicorn |
+| DEFECT-02 | CRITICAL | Deep links return 404 | main.py: SPA catch-all route |
+| GAP-06 | MEDIUM | Register ignores errors silently | Login.tsx: check response status |
+| GAP-07 | MEDIUM | Sign In always visible | Navbar.tsx: auth-aware Sign In/Out |
+
+## Files Changed
+- Dockerfile (line 49): CMD runs alembic upgrade head first
+- app/main.py: FileResponse import, /assets mount, catch-all route with path traversal protection
+- frontend/src/pages/Login.tsx: register error handling
+- frontend/src/components/Navbar.tsx: isLoggedIn state, Sign Out button, logout handler
+- Frontend rebuilt successfully (tsc + vite build clean)
+
+---------------------------------------------------------------

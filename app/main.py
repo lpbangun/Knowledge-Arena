@@ -2,8 +2,9 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
@@ -63,5 +64,17 @@ async def health():
 
 # Serve frontend SPA (must be LAST — after all API routes)
 _frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+_index_html = _frontend_dist / "index.html"
 if _frontend_dist.is_dir():
-    app.mount("/", StaticFiles(directory=str(_frontend_dist), html=True), name="spa")
+    # Serve static assets (JS, CSS, images) from /assets/
+    app.mount("/assets", StaticFiles(directory=str(_frontend_dist / "assets")), name="static-assets")
+
+    # SPA catch-all: serve index.html for any non-API route (deep links)
+    @app.get("/{full_path:path}")
+    async def spa_catchall(request: Request, full_path: str):
+        # If the path points to an actual file in dist, serve it
+        file_path = (_frontend_dist / full_path).resolve()
+        if full_path and file_path.is_file() and str(file_path).startswith(str(_frontend_dist.resolve())):
+            return FileResponse(str(file_path))
+        # Otherwise serve index.html for client-side routing
+        return FileResponse(str(_index_html))
