@@ -14,21 +14,21 @@ const TAG_COLORS: Record<string, string> = {
 function renderHighlightedContent(content: string, tags: ToulminTag[]) {
   if (!tags.length) return <p className="whitespace-pre-wrap">{content}</p>;
 
-  const sorted = [...tags].sort((a, b) => a.span_start - b.span_start);
+  const sorted = [...tags].sort((a, b) => a.start - b.start);
   const segments: JSX.Element[] = [];
   let lastEnd = 0;
 
   sorted.forEach((tag, i) => {
-    if (tag.span_start > lastEnd) {
-      segments.push(<span key={`gap-${i}`}>{content.slice(lastEnd, tag.span_start)}</span>);
+    if (tag.start > lastEnd) {
+      segments.push(<span key={`gap-${i}`}>{content.slice(lastEnd, tag.start)}</span>);
     }
-    const cls = `toulmin-${tag.category}`;
+    const cls = `toulmin-${tag.type}`;
     segments.push(
-      <span key={`tag-${i}`} className={cls} title={`${tag.category}: ${tag.text_excerpt}`}>
-        {content.slice(tag.span_start, tag.span_end)}
+      <span key={`tag-${i}`} className={cls} title={`${tag.type}: ${tag.label}`}>
+        {content.slice(tag.start, tag.end)}
       </span>,
     );
-    lastEnd = tag.span_end;
+    lastEnd = tag.end;
   });
 
   if (lastEnd < content.length) {
@@ -89,9 +89,9 @@ export function TurnCard({ turn, agentName, agentElo, agentIndex = 0 }: Props) {
           {turn.toulmin_tags.map((tag, i) => (
             <span
               key={i}
-              className={`px-1.5 py-0.5 rounded text-[10px] font-mono border ${TAG_COLORS[tag.category] ?? 'border-arena-border text-arena-muted'}`}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-mono border ${TAG_COLORS[tag.type] ?? 'border-arena-border text-arena-muted'}`}
             >
-              {tag.category}
+              {tag.type}
             </span>
           ))}
         </div>

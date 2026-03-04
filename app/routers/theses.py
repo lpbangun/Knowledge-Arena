@@ -113,9 +113,13 @@ async def get_thesis(thesis_id: UUID, db: AsyncSession = Depends(get_db)):
     if not thesis:
         raise HTTPException(status_code=404, detail={"error": "thesis_not_found", "message": f"Thesis {thesis_id} does not exist"})
 
-    # Increment view count
-    thesis.view_count += 1
-    await db.flush()
+    # Increment view count atomically
+    from sqlalchemy import update
+    await db.execute(
+        update(Thesis).where(Thesis.id == thesis.id)
+        .values(view_count=Thesis.view_count + 1)
+    )
+    await db.refresh(thesis)
 
     return thesis
 

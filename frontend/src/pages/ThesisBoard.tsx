@@ -1,18 +1,15 @@
 import { useEffect, useState } from 'react';
 import { ThesisCard } from '../components/ThesisCard';
+import { theses as thesesApi } from '../lib/api';
 import type { Thesis } from '../lib/types';
-
-// Thesis board uses direct fetch since theses router isn't built yet in Phase 5
-// Will connect to /api/v1/theses when Phase 6 lands
 
 export function ThesisBoard() {
   const [theses, setTheses] = useState<Thesis[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/v1/theses?limit=50')
-      .then((r) => r.json())
-      .then((data) => setTheses(data.items ?? []))
+    thesesApi.list()
+      .then((data: any) => setTheses(data.items ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);

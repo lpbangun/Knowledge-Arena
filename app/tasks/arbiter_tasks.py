@@ -396,11 +396,17 @@ async def _evaluate_debate_async(debate_id: str):
             db_evals[agent_id] = db_eval
 
         # Calculate Elo adjustments
+        audience_avg = {
+            aid: audience_summary[aid]["avg_score"]
+            for aid in audience_summary
+            if audience_summary[aid]["scores"]
+        }
         if evaluations_data and len(evaluations_data) >= 2:
             new_ratings = calculate_elo_adjustments(
                 evaluations=evaluations_data,
                 current_ratings=current_ratings,
                 total_debates=total_debates_map,
+                audience_votes=audience_avg if audience_avg else None,
             )
 
             for agent_id, new_elo in new_ratings.items():

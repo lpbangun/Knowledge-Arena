@@ -11,3 +11,27 @@ Starting from zero code. Full spec, design, and test-specs documents provided.
 Beginning Phase 0 scaffolding, then proceeding through all 7 phases sequentially.
 
 ---------------------------------------------------------------
+
+===============================================================
+[2026-03-03] OPERATOR PROMPT #2
+===============================================================
+
+Evaluate 6 proposed gaps against spec.md, design.md, and codebase:
+1. Cognitive Schema Bridge (BUP Git-style patches for OpenClaw L3/L5)
+2. Agent-Kit SDK (OpenClaw middleware with Context Compiler)
+3. Agent Capabilities Registry (JSONB field + discovery endpoint)
+4. Event-Driven Webhook Registry (callback_url push notifications)
+5. Coalition Mode (group_id + primary_agent_id for team debates)
+6. Structured Argument Graph Endpoint (GET /debates/{id}/graph DAG)
+
+## Context
+Post-build gap analysis — determining which proposed changes are real
+implementation gaps vs. hallucinated or misattributed concerns.
+
+## Response Summary
+All 6 rejected as implementation gaps. Items 1/2/5 conflate one agent
+framework's internals with platform scope. Item 4 contradicts documented
+design decision. Items 3/6 are valid feature requests deferred to post-MVP.
+No code changes made. Results logged to generation.log and decisions.log.
+
+---------------------------------------------------------------

@@ -1,4 +1,4 @@
-from sqlalchemy import select, exists
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.graph import GraphEdge, GraphNode
@@ -47,33 +47,37 @@ async def _find_unchallenged_auxiliaries(db: AsyncSession) -> list[GraphNode]:
 
 
 async def _find_one_sided_evidence(db: AsyncSession) -> list[GraphNode]:
-    # Nodes with supports but no contradicts
+    """Find empirical claims with SUPPORTS edges but no CONTRADICTS edges.
+    Uses a single aggregated query instead of per-node queries.
+    """
+    # Get candidate nodes
     result = await db.execute(
         select(GraphNode).where(
             GraphNode.node_type == GraphNodeType.EMPIRICAL_CLAIM,
         ).limit(50)
     )
     nodes = list(result.scalars().all())
+    if not nodes:
+        return []
+
+    node_ids = [n.id for n in nodes]
+
+    # Single query: aggregate edge types per target node
+    edge_counts = await db.execute(
+        select(
+            GraphEdge.target_node_id,
+            func.bool_or(GraphEdge.edge_type == GraphEdgeType.SUPPORTS).label("has_supports"),
+            func.bool_or(GraphEdge.edge_type == GraphEdgeType.CONTRADICTS).label("has_contradicts"),
+        )
+        .where(GraphEdge.target_node_id.in_(node_ids))
+        .group_by(GraphEdge.target_node_id)
+    )
+    edge_rows = {row[0]: (row[1], row[2]) for row in edge_counts.all()}
 
     one_sided = []
     for node in nodes:
-        supports = await db.execute(
-            select(GraphEdge).where(
-                GraphEdge.target_node_id == node.id,
-                GraphEdge.edge_type == GraphEdgeType.SUPPORTS,
-            ).limit(1)
-        )
-        has_supports = supports.scalar_one_or_none() is not None
-
-        contradicts = await db.execute(
-            select(GraphEdge).where(
-                GraphEdge.target_node_id == node.id,
-                GraphEdge.edge_type == GraphEdgeType.CONTRADICTS,
-            ).limit(1)
-        )
-        has_contradicts = contradicts.scalar_one_or_none() is not None
-
-        if has_supports and not has_contradicts:
+        info = edge_rows.get(node.id)
+        if info and info[0] and not info[1]:  # has_supports=True, has_contradicts=False
             one_sided.append(node)
             if len(one_sided) >= 10:
                 break
@@ -82,35 +86,45 @@ async def _find_one_sided_evidence(db: AsyncSession) -> list[GraphNode]:
 
 
 async def _find_contradictory_syntheses(db: AsyncSession) -> list[dict]:
-    """Find synthesis nodes that share evidence but reach different conclusions."""
+    """Find synthesis nodes that share evidence but reach different conclusions.
+    Uses batch-loaded edges instead of per-pair queries.
+    """
     result = await db.execute(
         select(GraphNode).where(
             GraphNode.node_type == GraphNodeType.SYNTHESIS_POSITION,
         ).limit(20)
     )
     syntheses = list(result.scalars().all())
+    if not syntheses:
+        return []
 
+    synthesis_ids = [s.id for s in syntheses]
+
+    # Single query: load all SUPPORTS edges targeting any synthesis node
+    edges_result = await db.execute(
+        select(GraphEdge.target_node_id, GraphEdge.source_node_id).where(
+            GraphEdge.target_node_id.in_(synthesis_ids),
+            GraphEdge.edge_type == GraphEdgeType.SUPPORTS,
+        )
+    )
+
+    # Build source-set per synthesis node
+    sources_by_node: dict = {}
+    for row in edges_result.all():
+        target_id, source_id = row[0], row[1]
+        if target_id not in sources_by_node:
+            sources_by_node[target_id] = set()
+        sources_by_node[target_id].add(source_id)
+
+    # Check pairwise overlap in Python
     gaps = []
     for i, s1 in enumerate(syntheses):
+        s1_sources = sources_by_node.get(s1.id, set())
+        if not s1_sources:
+            continue
         for s2 in syntheses[i + 1:]:
-            # Check if they share any evidence via edges
-            s1_sources = await db.execute(
-                select(GraphEdge.source_node_id).where(
-                    GraphEdge.target_node_id == s1.id,
-                    GraphEdge.edge_type == GraphEdgeType.SUPPORTS,
-                )
-            )
-            s2_sources = await db.execute(
-                select(GraphEdge.source_node_id).where(
-                    GraphEdge.target_node_id == s2.id,
-                    GraphEdge.edge_type == GraphEdgeType.SUPPORTS,
-                )
-            )
-
-            s1_ids = {row[0] for row in s1_sources.all()}
-            s2_ids = {row[0] for row in s2_sources.all()}
-
-            shared = s1_ids & s2_ids
+            s2_sources = sources_by_node.get(s2.id, set())
+            shared = s1_sources & s2_sources
             if shared:
                 gaps.append({
                     "type": "contradictory_syntheses",
@@ -118,7 +132,7 @@ async def _find_contradictory_syntheses(db: AsyncSession) -> list[dict]:
                     "shared_evidence_count": len(shared),
                     "content_a": s1.content[:100],
                     "content_b": s2.content[:100],
-                    "suggested_framing": f"Resolve contradicting syntheses with shared evidence",
+                    "suggested_framing": "Resolve contradicting syntheses with shared evidence",
                 })
 
     return gaps

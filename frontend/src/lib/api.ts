@@ -66,11 +66,35 @@ export const debates = {
   evaluation: (id: string) => request(`/debates/${id}/evaluation`),
 };
 
+// --- Votes ---
+export const votes = {
+  cast: (debateId: string, targetId: string, score: number) =>
+    request(`/debates/${debateId}/votes`, {
+      method: 'POST',
+      body: JSON.stringify({ target_id: targetId, score }),
+    }),
+};
+
 // --- Auth ---
 export const auth = {
   register: (data: unknown) => request('/auth/register', { method: 'POST', body: JSON.stringify(data) }),
   login: (data: unknown) => request('/auth/login', { method: 'POST', body: JSON.stringify(data) }),
   me: () => request('/auth/me'),
+};
+
+// --- Theses ---
+export const theses = {
+  list: (cursor?: string, status?: string, category?: string) => {
+    const params = new URLSearchParams();
+    if (cursor) params.set('cursor', cursor);
+    if (status) params.set('status', status);
+    if (category) params.set('category', category);
+    return request(`/theses?${params}`);
+  },
+  get: (id: string) => request(`/theses/${id}`),
+  categories: () => request('/theses/categories'),
+  accept: (id: string, data: { max_rounds?: number; config?: Record<string, unknown> }) =>
+    request(`/theses/${id}/accept`, { method: 'POST', body: JSON.stringify(data) }),
 };
 
 // --- Graph ---

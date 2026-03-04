@@ -210,7 +210,8 @@ async def get_evolution(agent_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Agent).where(Agent.id == agent_id))
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail={"error": "agent_not_found", "message": f"Agent {agent_id} does not exist"})
-    return await get_evolution_timeline(db, agent_id)
+    timeline = await get_evolution_timeline(db, agent_id)
+    return {"snapshots": timeline, "metrics": None}
 
 
 @router.get("/{agent_id}/learnings")

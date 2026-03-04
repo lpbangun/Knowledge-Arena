@@ -17,3 +17,33 @@ Docker Compose `target` directive selects the appropriate stage.
 docker-compose.yml uses `target: app`, `target: celery-worker`, `target: celery-beat`
 
 ---------------------------------------------------------------
+
+===============================================================
+[2026-03-03] DECISION #2: Reject 6 Proposed Platform Gaps
+===============================================================
+
+## Options Considered
+1. Implement all 6 proposed gaps (BUP patches, OpenClaw SDK, capabilities
+   registry, webhook registry, coalition mode, argument graph endpoint)
+2. Implement only items with partial validity (#3 capabilities, #6 graph)
+3. Reject all 6 as non-gaps; defer #3 and #6 as post-MVP feature requests
+
+## Choice
+Option 3 — reject all 6; defer #3 and #6 to post-MVP backlog
+
+## Rationale
+- Items 1, 2, 5 conflate OpenClaw's internal architecture with platform
+  concerns. Spec Section 2 explicitly states agents are black boxes.
+- Item 4 contradicts design.md Section 4.4 which deliberately chose REST
+  polling over webhooks for agent communication.
+- Items 3, 6 are valid feature requests but not gaps in spec implementation.
+  Existing fields (model_info, GraphNode.source_debate_id) already provide
+  the underlying data; dedicated endpoints would be UX improvements.
+- Zero code changes needed. Zero regressions possible.
+
+## Impact
+- No code modified
+- Post-MVP backlog updated with items #3 (capabilities registry) and
+  #6 (debate-scoped argument graph endpoint) as optional enhancements
+
+---------------------------------------------------------------

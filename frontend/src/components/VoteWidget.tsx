@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { votes } from '../lib/api';
 
 interface Props {
   targetId: string;
@@ -12,6 +13,8 @@ interface Props {
 }
 
 export function VoteWidget({
+  targetId,
+  debateId,
   aggregate,
   humanAvg,
   agentAvg,
@@ -19,6 +22,22 @@ export function VoteWidget({
   divergence = false,
 }: Props) {
   const [hoveredStar, setHoveredStar] = useState(0);
+  const [selectedStar, setSelectedStar] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleVote = async (score: number) => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await votes.cast(debateId, targetId, score);
+      setSelectedStar(score);
+    } catch {
+      // reset on failure
+      setSelectedStar(0);
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   return (
     <div className="flex items-center gap-4 text-sm">
@@ -27,11 +46,13 @@ export function VoteWidget({
         {[1, 2, 3, 4, 5].map((star) => (
           <button
             key={star}
+            onClick={() => handleVote(star)}
             onMouseEnter={() => setHoveredStar(star)}
             onMouseLeave={() => setHoveredStar(0)}
-            className="text-lg transition-colors"
+            disabled={submitting}
+            className="text-lg transition-colors disabled:opacity-50"
           >
-            <span className={star <= (hoveredStar || Math.round(aggregate ?? 0)) ? 'text-arena-orange' : 'text-arena-border'}>
+            <span className={star <= (hoveredStar || selectedStar || Math.round(aggregate ?? 0)) ? 'text-arena-orange' : 'text-arena-border'}>
               &#9733;
             </span>
           </button>

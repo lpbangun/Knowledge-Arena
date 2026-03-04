@@ -22,6 +22,7 @@ from app.models.enums import (
 )
 from app.schemas.common import CursorPage
 from app.schemas.debate import (
+    AmicusBriefCreate,
     CitationChallengeCreate,
     CommentCreate,
     ControlPlane,
@@ -356,7 +357,6 @@ async def submit_turn(
     )
     db.add(turn)
     await db.flush()
-    await db.commit()
 
     if debate.status == DebateStatus.PHASE_0 and data.turn_type in ("phase_0_declaration", "phase_0_negotiation"):
         validate_phase0_declaration.delay(str(turn.id), str(debate_id))
@@ -581,8 +581,12 @@ async def upvote_comment(
             "error": "comment_not_found", "message": "Comment not found"
         })
 
-    comment.upvote_count += 1
-    await db.flush()
+    from sqlalchemy import update
+    await db.execute(
+        update(Comment).where(Comment.id == comment.id)
+        .values(upvote_count=Comment.upvote_count + 1)
+    )
+    await db.refresh(comment)
 
     return {"comment_id": str(comment.id), "upvote_count": comment.upvote_count}
 
@@ -659,7 +663,21 @@ async def issue_citation_challenge(
                 "error": "no_challenges_remaining",
                 "message": "No citation challenges remaining"
             })
-        dp.citation_challenges_remaining -= 1
+        from sqlalchemy import update
+        result = await db.execute(
+            update(DebateParticipant)
+            .where(
+                DebateParticipant.id == dp.id,
+                DebateParticipant.citation_challenges_remaining > 0,
+            )
+            .values(citation_challenges_remaining=DebateParticipant.citation_challenges_remaining - 1)
+        )
+        if result.rowcount != 1:
+            raise HTTPException(status_code=409, detail={
+                "error": "no_challenges_remaining",
+                "message": "No citation challenges remaining"
+            })
+        await db.refresh(dp)
 
     challenge = CitationChallenge(
         debate_id=debate_id,
@@ -686,8 +704,7 @@ async def issue_citation_challenge(
 @router.post("/{debate_id}/amicus", status_code=201)
 async def submit_amicus_brief(
     debate_id: UUID,
-    content: str,
-    toulmin_tags: Optional[list] = None,
+    data: AmicusBriefCreate,
     agent: Agent = Depends(get_current_agent),
     db: AsyncSession = Depends(get_db),
 ):
@@ -716,12 +733,11 @@ async def submit_amicus_brief(
     brief = AmicusBrief(
         debate_id=debate_id,
         agent_id=agent.id,
-        content=content,
-        toulmin_tags=toulmin_tags,
+        content=data.content,
+        toulmin_tags=data.toulmin_tags,
     )
     db.add(brief)
     await db.flush()
-    await db.commit()
 
     evaluate_amicus_brief.delay(str(brief.id), str(debate_id))
 

@@ -2,12 +2,12 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 
 class AgentRegister(BaseModel):
     name: str = Field(max_length=100)
-    owner_email: str = Field(max_length=255)
+    owner_email: EmailStr = Field(max_length=255)
     owner_password: str = Field(min_length=8)
     owner_display_name: str = Field(max_length=100)
     model_info: dict = Field(default_factory=dict)

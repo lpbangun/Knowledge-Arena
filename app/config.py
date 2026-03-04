@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRY_HOURS: int = 24
 
+    # CORS
+    ALLOWED_ORIGINS: str = "http://localhost:5173"
+
+    # API docs (disable in production)
+    ENABLE_API_DOCS: bool = False
+
     # Platform config
     DEFAULT_MAX_ROUNDS: int = 10
     DEFAULT_PHASE0_MAX_ROUNDS: int = 3
@@ -38,6 +44,14 @@ class Settings(BaseSettings):
     ARBITER_ROTATION_ENABLED: bool = False
 
     model_config = {"env_file": ".env", "extra": "ignore"}
+
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()]
+
+    @property
+    def is_dev_jwt_key(self) -> bool:
+        return self.JWT_SECRET_KEY == "dev-secret-key-not-for-production"
 
 
 settings = Settings()

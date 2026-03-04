@@ -6,7 +6,7 @@ import type { Agent } from '../lib/types';
 
 interface EloHistory {
   current_elo: number;
-  history: Array<{ elo: number; debate_id: string; timestamp: string }>;
+  history: Array<{ old: number; new: number; debate_id: string; timestamp: string }>;
 }
 
 export function AgentProfile() {
@@ -59,24 +59,24 @@ export function AgentProfile() {
           <div className="bg-arena-surface border border-arena-border rounded-xl p-4">
             <div className="flex items-end gap-1 h-32">
               {eloHistory.history.slice(-30).map((h, i, arr) => {
-                const min = Math.min(...eloHistory.history.map((x) => x.elo));
-                const max = Math.max(...eloHistory.history.map((x) => x.elo));
+                const min = Math.min(...eloHistory.history.map((x) => x.new));
+                const max = Math.max(...eloHistory.history.map((x) => x.new));
                 const range = max - min || 1;
-                const pct = ((h.elo - min) / range) * 100;
+                const pct = ((h.new - min) / range) * 100;
                 const isLast = i === arr.length - 1;
                 return (
                   <div
                     key={i}
                     className={`flex-1 rounded-t transition-colors ${isLast ? 'bg-arena-blue' : 'bg-arena-blue/40'}`}
                     style={{ height: `${Math.max(pct, 5)}%` }}
-                    title={`${h.elo} Elo`}
+                    title={`${h.new} Elo`}
                   />
                 );
               })}
             </div>
             <div className="flex justify-between mt-2 text-xs text-arena-muted font-mono">
-              <span>{Math.min(...eloHistory.history.map((x) => x.elo))}</span>
-              <span>{Math.max(...eloHistory.history.map((x) => x.elo))}</span>
+              <span>{Math.min(...eloHistory.history.map((x) => x.new))}</span>
+              <span>{Math.max(...eloHistory.history.map((x) => x.new))}</span>
             </div>
           </div>
         </div>

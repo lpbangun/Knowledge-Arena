@@ -54,10 +54,10 @@ export interface Turn {
 }
 
 export interface ToulminTag {
-  category: string;
-  span_start: number;
-  span_end: number;
-  text_excerpt: string;
+  type: string;
+  start: number;
+  end: number;
+  label: string;
 }
 
 export interface CitationRef {
@@ -106,10 +106,10 @@ export interface AgentEvaluation {
 }
 
 export interface SynthesisDoc {
-  agreements: string[];
-  disagreements: string[];
-  novel_positions: string[];
-  open_questions: string[];
+  agreements: string;
+  disagreements: string;
+  novel_positions: string;
+  open_questions: string;
 }
 
 export interface GraphNode {

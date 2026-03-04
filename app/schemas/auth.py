@@ -2,19 +2,19 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from app.models.enums import UserRole
 
 
 class UserRegister(BaseModel):
-    email: str = Field(max_length=255)
+    email: EmailStr = Field(max_length=255)
     password: str = Field(min_length=8)
     display_name: str = Field(max_length=100)
 
 
 class UserLogin(BaseModel):
-    email: str
+    email: EmailStr
     password: str
 
 

@@ -358,3 +358,57 @@ duplication, and missing test files/fixtures.
 - All 9 new files (6 tests + 3 fixtures) confirmed present
 
 ---------------------------------------------------------------
+
+===============================================================
+[2026-03-03] [POST-BUILD] [DECISION] [6 PROPOSED GAPS ANALYSIS]
+===============================================================
+
+## Context
+Evaluated 6 proposed "gaps" against spec.md, design.md, and implemented
+codebase to determine which are real gaps vs. hallucinated or misattributed.
+
+## Analysis Results
+
+| # | Gap | Real Gap? | Action |
+|---|-----|-----------|--------|
+| 1 | Cognitive Schema Bridge (BUP Git patches) | No | None |
+| 2 | Agent-Kit SDK (OpenClaw Middleware) | No | None |
+| 3 | Agent Capabilities Registry | No (feature request) | Deferred |
+| 4 | Event-Driven Webhook Registry | No (intentional design) | None |
+| 5 | Coalition Mode | No (not in spec) | None |
+| 6 | Structured Argument Graph Endpoint | Partially | Deferred |
+
+## Breakdown
+
+### Items 1, 2, 5 — Conflate OpenClaw internals with platform concerns
+- HARD_CORE.md/PROTECTIVE_BELT.md are not platform files; hard core and
+  protective belt are text fields on DebateParticipant
+- "Git-style patches" is a frontend UI metaphor, not a data format
+- L3/L5 memory layers are OpenClaw-internal — spec says agents are black boxes
+- SDK/middleware for one agent framework violates black-box principle
+- Coalition/sub-agent hierarchies are internal to agents, invisible to platform
+
+### Item 4 — Contradicts documented architectural decision
+- design.md Section 4.4 explicitly chose polling over webhooks
+- Agents already have WebSocket option for near-real-time observation
+- No callback_url field exists on any model (confirmed across all 8 model files)
+
+### Items 3, 6 — Valid feature requests, not spec gaps
+- Capabilities registry: Agent.model_info JSONB already provides informal signals;
+  Thesis Board provides formal capability demonstration
+- Argument graph endpoint: data exists in GraphNode/GraphEdge with source_debate_id
+  linkage; GET /graph/nodes can be filtered; dedicated endpoint would be UX
+  improvement but not a missing spec requirement
+
+## Decisions Made
+- All 6 items rejected as implementation gaps — none require code changes
+- Items 3 and 6 logged to post-MVP backlog as optional feature requests
+- No code modified, no tests affected
+
+## Verification
+- Cross-referenced each claim against spec.md, design.md, and codebase
+- Confirmed no callback_url, capabilities, group_id, or coalition fields exist
+- Confirmed BUP JSON schema already machine-parseable (Section 10)
+- Confirmed polling model documented in design.md Section 4.4
+
+---------------------------------------------------------------

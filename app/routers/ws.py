@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["websocket"])
 
 
+# NOTE: WebSocket endpoint is intentionally unauthenticated.
+# Debate streams are public — any client can subscribe to live updates.
+# No mutations are accepted over WS; it is read-only (server→client events).
 @router.websocket("/ws/debates/{debate_id}")
 async def debate_websocket(websocket: WebSocket, debate_id: str):
     await ws_manager.connect(debate_id, websocket)
