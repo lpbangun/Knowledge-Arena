@@ -16,6 +16,15 @@ depends_on = None
 
 def upgrade() -> None:
     # --- ENUM TYPES ---
+    # Drop any orphaned enum types from a previous failed migration run
+    for t in [
+        "debatetatus", "participantrole", "turnvalidationstatus",
+        "citationchallengestatus", "thesisstatus", "votetype", "votertype",
+        "snapshottype", "graphnodetype", "graphedgetype", "verificationstatus",
+        "userrole",
+    ]:
+        op.execute(f"DROP TYPE IF EXISTS {t} CASCADE")
+
     # Create all PostgreSQL enum types used by the models
     debate_status = postgresql.ENUM(
         "phase_0", "active", "converged", "completed", "deadlocked",
@@ -108,7 +117,7 @@ def upgrade() -> None:
         sa.Column("display_name", sa.String(100), nullable=False),
         sa.Column("password_hash", sa.String(256), nullable=True),
         sa.Column("auth_provider", sa.String(50), nullable=False, server_default="email"),
-        sa.Column("role", sa.Enum("observer", "admin", name="userrole"), nullable=False, server_default="observer"),
+        sa.Column("role", postgresql.ENUM("observer", "admin", name="userrole", create_type=False), nullable=False, server_default="observer"),
         sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
     )
@@ -140,19 +149,19 @@ def upgrade() -> None:
     op.create_table(
         "graph_nodes",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("node_type", sa.Enum(
+        sa.Column("node_type", postgresql.ENUM(
             "hard_core", "auxiliary_hypothesis", "empirical_claim", "evidence",
             "synthesis_position", "open_question", "standing_thesis",
-            name="graphnodetype",
+            name="graphnodetype", create_type=False,
         ), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("source_debate_id", sa.Uuid(), nullable=True),
         sa.Column("source_agent_id", sa.Uuid(), sa.ForeignKey("agents.id"), nullable=True),
         sa.Column("source_turn_id", sa.Uuid(), nullable=True),
         sa.Column("toulmin_category", sa.String(20), nullable=True),
-        sa.Column("verification_status", sa.Enum(
+        sa.Column("verification_status", postgresql.ENUM(
             "verified", "unverified", "challenged", "falsified",
-            name="verificationstatus",
+            name="verificationstatus", create_type=False,
         ), nullable=False, server_default="unverified"),
         sa.Column("quality_score", sa.Float(), nullable=True),
         sa.Column("challenge_count", sa.Integer(), nullable=False, server_default="0"),
@@ -174,9 +183,9 @@ def upgrade() -> None:
         sa.Column("category", sa.String(100), nullable=True),
         sa.Column("is_gap_filling", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column("gap_reference", sa.Uuid(), sa.ForeignKey("graph_nodes.id"), nullable=True),
-        sa.Column("status", sa.Enum(
+        sa.Column("status", postgresql.ENUM(
             "open", "challenged", "debating", "resolved", "standing_unchallenged",
-            name="thesisstatus",
+            name="thesisstatus", create_type=False,
         ), nullable=False, server_default="open"),
         sa.Column("view_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("challenger_count", sa.Integer(), nullable=False, server_default="0"),
@@ -195,10 +204,10 @@ def upgrade() -> None:
         sa.Column("category", sa.String(100), nullable=True),
         sa.Column("created_by", sa.Uuid(), sa.ForeignKey("agents.id"), nullable=False),
         sa.Column("source_thesis_id", sa.Uuid(), sa.ForeignKey("theses.id"), nullable=True),
-        sa.Column("status", sa.Enum(
+        sa.Column("status", postgresql.ENUM(
             "phase_0", "active", "converged", "completed", "deadlocked",
             "evaluation", "synthesis", "done", "evaluation_failed",
-            name="debatetatus",
+            name="debatetatus", create_type=False,
         ), nullable=False, server_default="phase_0"),
         sa.Column("config", postgresql.JSONB(), nullable=False, server_default="{}"),
         sa.Column("phase_0_structure", postgresql.JSONB(), nullable=True),
@@ -223,9 +232,9 @@ def upgrade() -> None:
         sa.Column("toulmin_tags", postgresql.JSONB(), nullable=False, server_default="[]"),
         sa.Column("falsification_target", postgresql.JSONB(), nullable=True),
         sa.Column("citation_references", postgresql.JSONB(), nullable=False, server_default="[]"),
-        sa.Column("validation_status", sa.Enum(
+        sa.Column("validation_status", postgresql.ENUM(
             "pending", "valid", "rejected", "resubmitted",
-            name="turnvalidationstatus",
+            name="turnvalidationstatus", create_type=False,
         ), nullable=False, server_default="pending"),
         sa.Column("validation_feedback", sa.Text(), nullable=True),
         sa.Column("arbiter_quality_score", sa.Float(), nullable=True),
@@ -244,7 +253,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), primary_key=True),
         sa.Column("debate_id", sa.Uuid(), sa.ForeignKey("debates.id"), nullable=False),
         sa.Column("agent_id", sa.Uuid(), sa.ForeignKey("agents.id"), nullable=False),
-        sa.Column("role", sa.Enum("debater", "audience", name="participantrole"), nullable=False),
+        sa.Column("role", postgresql.ENUM("debater", "audience", name="participantrole", create_type=False), nullable=False),
         sa.Column("school_of_thought", sa.String(200), nullable=True),
         sa.Column("hard_core", sa.Text(), nullable=True),
         sa.Column("auxiliary_hypotheses", postgresql.JSONB(), nullable=True),
@@ -262,12 +271,12 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), primary_key=True),
         sa.Column("debate_id", sa.Uuid(), sa.ForeignKey("debates.id"), nullable=False),
         sa.Column("challenger_id", sa.Uuid(), nullable=False),
-        sa.Column("challenger_type", sa.Enum("human", "agent", name="votertype"), nullable=False),
+        sa.Column("challenger_type", postgresql.ENUM("human", "agent", name="votertype", create_type=False), nullable=False),
         sa.Column("target_turn_id", sa.Uuid(), sa.ForeignKey("turns.id"), nullable=False),
         sa.Column("target_citation_index", sa.Integer(), nullable=False),
-        sa.Column("status", sa.Enum(
+        sa.Column("status", postgresql.ENUM(
             "pending", "verified", "failed", "frivolous",
-            name="citationchallengestatus",
+            name="citationchallengestatus", create_type=False,
         ), nullable=False, server_default="pending"),
         sa.Column("response_evidence", postgresql.JSONB(), nullable=True),
         sa.Column("arbiter_ruling", sa.Text(), nullable=True),
@@ -281,9 +290,9 @@ def upgrade() -> None:
     op.create_table(
         "votes",
         sa.Column("id", sa.Uuid(), primary_key=True),
-        sa.Column("vote_type", sa.Enum("turn_quality", "debate_outcome", name="votetype"), nullable=False),
+        sa.Column("vote_type", postgresql.ENUM("turn_quality", "debate_outcome", name="votetype", create_type=False), nullable=False),
         sa.Column("target_id", sa.Uuid(), nullable=False),
-        sa.Column("voter_type", sa.Enum("human", "agent", name="votertype"), nullable=False),
+        sa.Column("voter_type", postgresql.ENUM("human", "agent", name="votertype", create_type=False), nullable=False),
         sa.Column("voter_id", sa.Uuid(), nullable=False),
         sa.Column("score", sa.Integer(), nullable=True),
         sa.Column("outcome_choice", sa.String(200), nullable=True),
@@ -298,7 +307,7 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), primary_key=True),
         sa.Column("debate_id", sa.Uuid(), sa.ForeignKey("debates.id"), nullable=False),
         sa.Column("target_turn_id", sa.Uuid(), sa.ForeignKey("turns.id"), nullable=True),
-        sa.Column("author_type", sa.Enum("human", "agent", name="votertype"), nullable=False),
+        sa.Column("author_type", postgresql.ENUM("human", "agent", name="votertype", create_type=False), nullable=False),
         sa.Column("author_id", sa.Uuid(), nullable=False),
         sa.Column("parent_comment_id", sa.Uuid(), sa.ForeignKey("comments.id"), nullable=True),
         sa.Column("content", sa.Text(), nullable=False),
@@ -327,10 +336,10 @@ def upgrade() -> None:
         sa.Column("id", sa.Uuid(), primary_key=True),
         sa.Column("source_node_id", sa.Uuid(), sa.ForeignKey("graph_nodes.id"), nullable=False),
         sa.Column("target_node_id", sa.Uuid(), sa.ForeignKey("graph_nodes.id"), nullable=False),
-        sa.Column("edge_type", sa.Enum(
+        sa.Column("edge_type", postgresql.ENUM(
             "supports", "contradicts", "falsifies", "qualifies", "extends",
             "synthesizes", "challenges", "evolved_from",
-            name="graphedgetype",
+            name="graphedgetype", create_type=False,
         ), nullable=False),
         sa.Column("source_debate_id", sa.Uuid(), sa.ForeignKey("debates.id"), nullable=True),
         sa.Column("source_agent_id", sa.Uuid(), sa.ForeignKey("agents.id"), nullable=True),
@@ -412,7 +421,7 @@ def upgrade() -> None:
         sa.Column("agent_id", sa.Uuid(), sa.ForeignKey("agents.id"), nullable=False),
         sa.Column("debate_id", sa.Uuid(), sa.ForeignKey("debates.id"), nullable=True),
         sa.Column("bup_id", sa.Uuid(), sa.ForeignKey("belief_update_packets.id"), nullable=True),
-        sa.Column("snapshot_type", sa.Enum("pre_debate", "post_debate", name="snapshottype"), nullable=False),
+        sa.Column("snapshot_type", postgresql.ENUM("pre_debate", "post_debate", name="snapshottype", create_type=False), nullable=False),
         sa.Column("hard_core", sa.Text(), nullable=False),
         sa.Column("auxiliary_hypotheses", postgresql.JSONB(), nullable=False, server_default="[]"),
         sa.Column("qualifier_count", sa.Integer(), nullable=False, server_default="0"),
