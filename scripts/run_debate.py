@@ -44,8 +44,8 @@ if _env_path.exists():
 
 BASE_URL = "https://knowledge-arena.up.railway.app"
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-MAX_POLL_ATTEMPTS = 60  # max times to poll for validation/round advance
-POLL_INTERVAL = 5  # seconds between polls
+MAX_POLL_ATTEMPTS = 30  # max times to poll for validation/round advance
+POLL_INTERVAL = 3  # seconds between polls
 LLM_TIMEOUT = 120  # seconds for LLM calls
 
 DEBATE_TOPIC = (
@@ -382,37 +382,59 @@ CRITICAL RULES:
 
 # ─── API Helpers ──────────────────────────────────────────────────────────────
 
+API_MAX_RETRIES = 3
+
 async def api_call(client: httpx.AsyncClient, method: str, path: str,
                    headers: dict = None, json_data: dict = None,
-                   expected_status: list = None) -> tuple[int, dict]:
-    """Make an API call and return (status_code, response_json)."""
+                   expected_status: list = None,
+                   timeout_override: float = None) -> tuple[int, dict]:
+    """Make an API call with retries and return (status_code, response_json)."""
     url = f"{BASE_URL}{path}"
     expected = expected_status or [200, 201, 202]
-    try:
-        if method == "GET":
-            resp = await client.get(url, headers=headers)
-        elif method == "POST":
-            resp = await client.post(url, headers=headers, json=json_data)
-        elif method == "PATCH":
-            resp = await client.patch(url, headers=headers, json=json_data)
-        else:
-            raise ValueError(f"Unsupported method: {method}")
 
+    for attempt in range(1, API_MAX_RETRIES + 1):
         try:
-            body = resp.json()
-        except Exception:
-            body = {"raw": resp.text[:500]}
+            kwargs = {"headers": headers}
+            if json_data is not None:
+                kwargs["json"] = json_data
+            if timeout_override:
+                kwargs["timeout"] = timeout_override
 
-        if resp.status_code not in expected:
-            log.fail(f"API {method} {path} → {resp.status_code}", response=body)
+            if method == "GET":
+                resp = await client.get(url, **kwargs)
+            elif method == "POST":
+                resp = await client.post(url, **kwargs)
+            elif method == "PATCH":
+                resp = await client.patch(url, **kwargs)
+            else:
+                raise ValueError(f"Unsupported method: {method}")
 
-        return resp.status_code, body
-    except httpx.TimeoutException:
-        log.fail(f"API timeout: {method} {path}")
-        return 0, {"error": "timeout"}
-    except Exception as e:
-        log.fail(f"API error: {method} {path}", error=str(e))
-        return 0, {"error": str(e)}
+            try:
+                body = resp.json()
+            except Exception:
+                body = {"raw": resp.text[:500]}
+
+            if resp.status_code not in expected:
+                log.fail(f"API {method} {path} -> {resp.status_code}", response=body)
+
+            return resp.status_code, body
+        except httpx.TimeoutException:
+            if attempt < API_MAX_RETRIES:
+                wait = 5 * attempt
+                log.warn(f"API timeout: {method} {path}, retry {attempt}/{API_MAX_RETRIES} in {wait}s")
+                await asyncio.sleep(wait)
+            else:
+                log.fail(f"API timeout after {API_MAX_RETRIES} retries: {method} {path}")
+                return 0, {"error": "timeout"}
+        except Exception as e:
+            if attempt < API_MAX_RETRIES:
+                wait = 3 * attempt
+                log.warn(f"API error: {method} {path}, retry {attempt}", error=str(e)[:80])
+                await asyncio.sleep(wait)
+            else:
+                log.fail(f"API error after retries: {method} {path}", error=str(e))
+                return 0, {"error": str(e)}
+    return 0, {"error": "exhausted retries"}
 
 
 # ─── Debate Runner ────────────────────────────────────────────────────────────
@@ -423,7 +445,7 @@ async def run_debate(max_rounds: int = 8):
     agents: list[AgentState] = []
     debate_id = None
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=httpx.Timeout(connect=15.0, read=120.0, write=15.0, pool=15.0)) as client:
 
         # ─── Step 0: Health Check ─────────────────────────────────────────
         log.step("HEALTH CHECK")
@@ -502,7 +524,9 @@ async def run_debate(max_rounds: int = 8):
         # ─── Step 4: Phase 0 — Lakatosian Declarations ───────────────────
         log.step("PHASE 0: LAKATOSIAN DECLARATIONS (parallel)")
 
-        async def generate_and_submit_declaration(agent: AgentState):
+        async def generate_and_submit_declaration(agent: AgentState, stagger: float = 0):
+            if stagger > 0:
+                await asyncio.sleep(stagger)
             log.info(f"Generating declaration for {agent.name} via {agent.model_id}...")
             prompt = f"""You are entering a structured academic debate.
 Topic: {DEBATE_TOPIC}
@@ -538,7 +562,8 @@ Do NOT wrap your response in any JSON or code blocks. Just write the declaration
                 log.fail(f"{agent.name} declaration error", error=str(e))
                 agent.errors.append(str(e))
 
-        await asyncio.gather(*[generate_and_submit_declaration(a) for a in agents])
+        # Stagger submissions by 1s each to avoid overwhelming the server
+        await asyncio.gather(*[generate_and_submit_declaration(a, i * 1.0) for i, a in enumerate(agents)])
 
         # Wait for all Phase 0 declarations to be validated
         log.info("Waiting for Phase 0 declarations to be validated by arbiter...")
@@ -575,7 +600,11 @@ Do NOT wrap your response in any JSON or code blocks. Just write the declaration
                 else:
                     log.fail(f"{agent.name} negotiation failed", response=body)
 
-            await asyncio.gather(*[submit_negotiation(a) for a in agents])
+            # Stagger negotiation submissions
+            async def staggered_negotiation(agent, delay):
+                await asyncio.sleep(delay)
+                await submit_negotiation(agent)
+            await asyncio.gather(*[staggered_negotiation(a, i * 2.0) for i, a in enumerate(agents)])
 
             # Wait for transition to ACTIVE
             log.info("Waiting for debate to transition to ACTIVE...")
@@ -683,6 +712,9 @@ Generate your argument now."""
                 for a in agents
             ])
 
+            # Wait for server-side round advance retries (up to 3s), then check for failed agents
+            await asyncio.sleep(5)
+
             # Wait for all turns to be validated and round to advance
             log.info(f"Waiting for round {round_num} validation and advancement...")
             advanced = await _wait_for_round_advance(client, agents[0], debate_id, round_num)
@@ -704,11 +736,11 @@ Generate your argument now."""
         log.info(f"Final round: {final_debate.get('current_round')}")
         log.info(f"Convergence signals: {final_debate.get('convergence_signals')}")
 
-        # Wait a bit for evaluation to complete if debate just ended
+        # Wait briefly for evaluation (Celery may not be running)
         if final_debate.get("status") in ("completed", "evaluation", "synthesis"):
-            log.info("Waiting for post-debate evaluation (Layer 2 arbiter)...")
-            for attempt in range(30):
-                await asyncio.sleep(10)
+            log.info("Waiting for post-debate evaluation (up to 30s)...")
+            for attempt in range(6):
+                await asyncio.sleep(5)
                 _, check = await api_call(client, "GET", f"/api/v1/debates/{debate_id}")
                 if check.get("status") == "done":
                     log.ok("Evaluation complete — debate is DONE")
@@ -716,7 +748,8 @@ Generate your argument now."""
                 elif check.get("status") == "evaluation_failed":
                     log.warn("Evaluation failed")
                     break
-                log.info(f"  Still evaluating... (status={check.get('status')}, attempt {attempt+1}/30)")
+            else:
+                log.warn("Evaluation did not complete (Celery/arbiter likely unavailable)")
 
         # Fetch evaluation results
         _, eval_data = await api_call(client, "GET",

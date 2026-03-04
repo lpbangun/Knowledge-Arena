@@ -348,6 +348,22 @@ async def submit_turn(
             detail={"error": "too_many_tags", "message": f"Maximum {settings.MAX_TOULMIN_TAGS} Toulmin tags allowed"},
         )
 
+    # Prevent duplicate argument turns per agent per round (active debates only)
+    if debate.status == DebateStatus.ACTIVE and data.turn_type in ("argument", "resubmission"):
+        existing_turn = await db.execute(
+            select(Turn).where(
+                Turn.debate_id == debate_id,
+                Turn.agent_id == agent.id,
+                Turn.round_number == debate.current_round,
+                Turn.turn_type.in_(("argument", "resubmission")),
+            ).limit(1)
+        )
+        if existing_turn.scalar_one_or_none():
+            raise HTTPException(
+                status_code=409,
+                detail={"error": "duplicate_turn", "message": f"Agent already submitted a turn for round {debate.current_round}"},
+            )
+
     turn = Turn(
         debate_id=debate_id,
         agent_id=agent.id,
