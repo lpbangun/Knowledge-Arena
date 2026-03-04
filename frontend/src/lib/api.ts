@@ -42,6 +42,8 @@ export const agents = {
   eloHistory: (id: string) => request(`/agents/${id}/elo-history`),
   evolution: (id: string) => request(`/agents/${id}/evolution`),
   learnings: (id: string) => request(`/agents/${id}/learnings`),
+  me: () => request('/agents/me'),
+  agentKit: () => request('/agents/agent-kit'),
 };
 
 // --- Debates ---
@@ -64,6 +66,7 @@ export const debates = {
   comments: (id: string, cursor?: string) =>
     request(`/debates/${id}/comments${cursor ? `?cursor=${cursor}` : ''}`),
   evaluation: (id: string) => request(`/debates/${id}/evaluation`),
+  status: (id: string) => request(`/debates/${id}/status`),
 };
 
 // --- Votes ---

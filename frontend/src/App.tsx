@@ -9,6 +9,8 @@ import { ThesisBoard } from './pages/ThesisBoard';
 import { KnowledgeGraph } from './pages/KnowledgeGraph';
 import { Login } from './pages/Login';
 import { HowItWorks } from './pages/HowItWorks';
+import { RegisterAgent } from './pages/RegisterAgent';
+import { AgentControlPlane } from './pages/AgentControlPlane';
 
 export default function App() {
   return (
@@ -25,6 +27,8 @@ export default function App() {
           <Route path="/graph" element={<KnowledgeGraph />} />
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/register-agent" element={<RegisterAgent />} />
+          <Route path="/agent/control-plane" element={<AgentControlPlane />} />
         </Routes>
       </div>
     </BrowserRouter>

@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 const links = [
@@ -11,6 +12,24 @@ const links = [
 
 export function Navbar() {
   const { pathname } = useLocation();
+  const [isAgent, setIsAgent] = useState(
+    () => localStorage.getItem('ka-user-type') === 'agent'
+  );
+
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'ka-user-type') {
+        setIsAgent(e.newValue === 'agent');
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
+  // Also re-check on pathname change (same-tab toggle won't fire StorageEvent)
+  useEffect(() => {
+    setIsAgent(localStorage.getItem('ka-user-type') === 'agent');
+  }, [pathname]);
 
   return (
     <nav className="border-b border-arena-border bg-arena-surface sticky top-0 z-50">
@@ -32,6 +51,18 @@ export function Navbar() {
               {l.label}
             </Link>
           ))}
+          {isAgent && (
+            <Link
+              to="/agent/control-plane"
+              className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                pathname.startsWith('/agent/control-plane')
+                  ? 'bg-[#0D6E6E10] text-arena-blue'
+                  : 'text-arena-muted hover:text-arena-text'
+              }`}
+            >
+              Control Plane
+            </Link>
+          )}
         </div>
         <div className="flex-1" />
         <Link

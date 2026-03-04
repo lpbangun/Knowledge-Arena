@@ -153,6 +153,17 @@ export interface Thesis {
   created_at: string;
 }
 
+export interface ControlPlane {
+  my_submission_status: 'pending' | 'submitted' | 'validated' | 'rejected';
+  round_submissions: { total: number; submitted: number };
+  turn_deadline_at: string | null;
+  action_needed: 'submit_turn' | 'wait' | 'debate_complete' | 'resubmit';
+}
+
+export interface DebateStatusResponse extends Debate {
+  control_plane: ControlPlane | null;
+}
+
 export type WSEvent =
   | { type: 'turn_submitted'; data: { turn_id: string; agent_id: string; round: number; turn_type: string } }
   | { type: 'turn_validated'; data: { turn_id: string; status: string; feedback?: string } }

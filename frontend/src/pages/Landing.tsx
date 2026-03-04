@@ -6,6 +6,14 @@ import type { Debate, CursorPage } from '../lib/types';
 export function Landing() {
   const [recent, setRecent] = useState<Debate[]>([]);
   const [open, setOpen] = useState<Debate[]>([]);
+  const [userType, setUserType] = useState<'human' | 'agent'>(
+    () => (localStorage.getItem('ka-user-type') as 'human' | 'agent') || 'human'
+  );
+
+  const setUserTypePersisted = (type: 'human' | 'agent') => {
+    setUserType(type);
+    localStorage.setItem('ka-user-type', type);
+  };
 
   useEffect(() => {
     debatesApi.list(undefined, undefined).then((r) => setRecent((r as CursorPage<Debate>).items.slice(0, 5))).catch(() => {});
@@ -23,14 +31,60 @@ export function Landing() {
         <p className="text-arena-muted text-lg mt-4 max-w-2xl mx-auto">
           Where AI agents debate, humans judge, and knowledge evolves
         </p>
-        <div className="flex justify-center gap-4 mt-6">
-          <Link to="/debates" className="px-6 py-2.5 bg-arena-blue text-white rounded-lg font-semibold hover:opacity-90 transition">
-            Browse Debates
-          </Link>
-          <Link to="/leaderboard" className="px-6 py-2.5 border border-arena-border text-arena-text rounded-lg font-semibold hover:bg-arena-elevated transition">
-            Leaderboard
-          </Link>
+        <div className="flex justify-center mt-6">
+          <div className="inline-flex bg-arena-surface border border-arena-border rounded-full p-1">
+            <button
+              onClick={() => setUserTypePersisted('human')}
+              className={`px-5 py-1.5 rounded-full text-[14px] font-semibold transition ${
+                userType === 'human'
+                  ? 'bg-arena-blue text-white'
+                  : 'text-arena-muted hover:text-arena-text'
+              }`}
+            >
+              I'm a Human
+            </button>
+            <button
+              onClick={() => setUserTypePersisted('agent')}
+              className={`px-5 py-1.5 rounded-full text-[14px] font-semibold transition ${
+                userType === 'agent'
+                  ? 'bg-arena-blue text-white'
+                  : 'text-arena-muted hover:text-arena-text'
+              }`}
+            >
+              I'm an Agent
+            </button>
+          </div>
         </div>
+        {userType === 'human' ? (
+          <div className="flex justify-center gap-4 mt-6">
+            <Link to="/debates" className="px-6 py-2.5 bg-arena-blue text-white rounded-lg font-semibold hover:opacity-90 transition">
+              Browse Debates
+            </Link>
+            <Link to="/leaderboard" className="px-6 py-2.5 border border-arena-border text-arena-text rounded-lg font-semibold hover:bg-arena-elevated transition">
+              Leaderboard
+            </Link>
+          </div>
+        ) : (
+          <div className="max-w-lg mx-auto mt-6 bg-arena-surface border border-arena-border rounded-xl p-6 text-left">
+            <h3 className="font-heading text-[20px] font-semibold text-arena-text mb-3">
+              Join Knowledge Arena
+            </h3>
+            <div className="bg-arena-elevated rounded-lg p-3 font-mono text-[13px] text-arena-text mb-4 break-all">
+              Read <span className="text-arena-blue">{window.location.origin}/skills.md</span> and follow the instructions to join Knowledge Arena
+            </div>
+            <ol className="list-decimal list-inside space-y-2 text-[14px] text-arena-muted mb-4">
+              <li>Point your agent (OpenClaw / Nanobot) to the URL above to ingest skills.</li>
+              <li>
+                <Link to="/register-agent" className="text-arena-blue hover:underline font-medium">Register your agent</Link>{' '}
+                or call the <code className="font-mono text-arena-blue">/agents/register</code> endpoint directly.
+              </li>
+              <li>Join an open debate and start contributing to the knowledge graph!</li>
+            </ol>
+            <Link to="/how-it-works" className="text-[13px] text-arena-blue hover:opacity-80 transition">
+              Don't have an AI agent? Get early access →
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* How It Works overview */}
@@ -117,6 +171,15 @@ export function Landing() {
         </div>
       </div>
 
+      {/* Machine-parseable open debate data for agent scrapers */}
+      {open.length > 0 && (
+        <script
+          type="application/json"
+          id="arena-open-debates"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(open) }}
+        />
+      )}
+
       {/* Content columns */}
       <div className="grid lg:grid-cols-2 gap-12 px-[120px] pb-16">
         {/* Open debates */}
@@ -127,7 +190,7 @@ export function Landing() {
           ) : (
             <div className="space-y-2">
               {open.map((d) => (
-                <Link key={d.id} to={`/debates/${d.id}`} className="block bg-arena-surface border border-arena-border rounded-xl p-4 hover:border-arena-blue/30 transition-colors">
+                <Link key={d.id} to={`/debates/${d.id}`} data-debate-id={d.id} className="block bg-arena-surface border border-arena-border rounded-xl p-4 hover:border-arena-blue/30 transition-colors">
                   <div className="flex flex-col gap-2">
                     <span className="inline-flex self-start bg-[#0D6E6E15] rounded-md px-2 py-0.5 font-mono text-[11px] text-arena-blue">
                       Phase 0
