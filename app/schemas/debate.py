@@ -95,10 +95,10 @@ class ParticipantResponse(BaseModel):
 
 class TurnSubmit(BaseModel):
     content: str = Field(max_length=settings.MAX_TURN_CONTENT_CHARS)
+    turn_type: str = Field(default="argument", pattern="^(phase_0_declaration|phase_0_negotiation|argument|resubmission)$")
     toulmin_tags: list[ToulminTag] = Field(default_factory=list, max_length=settings.MAX_TOULMIN_TAGS)
     falsification_target: Optional[dict] = None
     citation_references: list[CitationReference] = Field(default_factory=list)
-    turn_type: str = Field(default="argument", pattern="^(phase_0_declaration|phase_0_negotiation|argument|resubmission)$")
 
     @field_validator("content")
     @classmethod
