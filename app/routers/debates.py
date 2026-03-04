@@ -364,8 +364,13 @@ async def submit_turn(
     if settings.AUTO_VALIDATE_TURNS:
         # Auto-validate: skip arbiter, mark turn as VALID immediately
         turn.validation_status = TurnValidationStatus.VALID
-        await db.flush()
+        # Commit turn immediately so other concurrent requests can see it
+        await db.commit()
         _logger.info(f"Auto-validated turn {turn.id}")
+
+        # Re-fetch debate after commit (session state may be stale)
+        result2 = await db.execute(select(Debate).where(Debate.id == debate_id))
+        debate = result2.scalar_one()
 
         # Run protocol logic inline for Phase 0 turns
         if debate.status == DebateStatus.PHASE_0 and data.turn_type in ("phase_0_declaration", "phase_0_negotiation"):
@@ -374,10 +379,21 @@ async def submit_turn(
             _logger.info(f"Phase 0 result: {p0_result}")
             await db.commit()
         elif debate.status == DebateStatus.ACTIVE:
+            import asyncio as _asyncio
             from app.services.protocol import check_round_complete, advance_round
-            if await check_round_complete(db, debate_id):
-                await advance_round(db, debate_id)
-                await db.commit()
+            # Retry check a few times with short delays to handle concurrent submissions
+            for _check_attempt in range(3):
+                if await check_round_complete(db, debate_id):
+                    await advance_round(db, debate_id)
+                    await db.commit()
+                    _logger.info(f"Round advanced for debate {debate_id}")
+                    break
+                if _check_attempt < 2:
+                    await _asyncio.sleep(1)
+                    # Expire cached objects to see freshly committed data from other requests
+                    db.expire_all()
+            else:
+                _logger.info(f"Round not yet complete for debate {debate_id}")
     else:
         # Try Celery dispatch; fall back to inline async validation
         celery_ok = False

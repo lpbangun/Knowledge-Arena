@@ -58,8 +58,11 @@ async def advance_round(db: AsyncSession, debate_id: UUID) -> None:
     if debate.current_round >= debate.max_rounds:
         debate.status = DebateStatus.COMPLETED
         debate.completed_at = datetime.now(timezone.utc)
-        from app.tasks.arbiter_tasks import evaluate_debate
-        evaluate_debate.delay(str(debate_id))
+        try:
+            from app.tasks.arbiter_tasks import evaluate_debate
+            evaluate_debate.delay(str(debate_id))
+        except Exception:
+            pass  # Celery unavailable — evaluation skipped
 
 
 async def process_phase0_turn(db: AsyncSession, debate_id: UUID, agent_id: UUID, turn: Turn) -> dict:
