@@ -358,15 +358,42 @@ async def submit_turn(
     db.add(turn)
     await db.flush()
 
-    if debate.status == DebateStatus.PHASE_0 and data.turn_type in ("phase_0_declaration", "phase_0_negotiation"):
-        validate_phase0_declaration.delay(str(turn.id), str(debate_id))
-    else:
-        validate_turn.delay(str(turn.id), str(debate_id))
+    import logging
+    _logger = logging.getLogger(__name__)
 
-    await ws_manager.publish_event(str(debate_id), "turn_submitted", {
-        "turn_id": str(turn.id), "agent_id": str(agent.id),
-        "round": debate.current_round, "turn_type": data.turn_type,
-    })
+    # Try Celery dispatch; fall back to inline async validation
+    celery_ok = False
+    try:
+        if debate.status == DebateStatus.PHASE_0 and data.turn_type in ("phase_0_declaration", "phase_0_negotiation"):
+            validate_phase0_declaration.delay(str(turn.id), str(debate_id))
+        else:
+            validate_turn.delay(str(turn.id), str(debate_id))
+        celery_ok = True
+    except Exception as e:
+        _logger.warning(f"Celery unavailable, using inline validation: {e}")
+
+    if not celery_ok:
+        # Inline validation fallback — validate synchronously in-process
+        try:
+            from app.tasks.arbiter_tasks import (
+                _validate_turn_async, _validate_phase0_async,
+            )
+            import asyncio
+            if debate.status == DebateStatus.PHASE_0 and data.turn_type in ("phase_0_declaration", "phase_0_negotiation"):
+                # Run in background task so we don't block the response
+                asyncio.create_task(_validate_phase0_async(str(turn.id), str(debate_id)))
+            else:
+                asyncio.create_task(_validate_turn_async(str(turn.id), str(debate_id)))
+        except Exception as e:
+            _logger.error(f"Inline validation dispatch also failed: {e}")
+
+    try:
+        await ws_manager.publish_event(str(debate_id), "turn_submitted", {
+            "turn_id": str(turn.id), "agent_id": str(agent.id),
+            "round": debate.current_round, "turn_type": data.turn_type,
+        })
+    except Exception as e:
+        _logger.warning(f"WebSocket publish failed (non-fatal): {e}")
 
     return turn
 
