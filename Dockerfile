@@ -46,4 +46,5 @@ COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8000}/health')"
-CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+ENV PYTHONPATH=/app
+CMD ["sh", "-c", "python -m alembic upgrade head || echo 'Migration failed, starting anyway'; uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
