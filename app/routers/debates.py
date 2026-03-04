@@ -180,11 +180,14 @@ async def get_debate_status(
     )
     total_debaters = debater_count_result.scalar() or 0
 
-    # Count submitted turns this round (unique agents with any submission)
+    # Count submitted turns this round (unique agents)
+    # When debate is ACTIVE, only count argument/resubmission turns (not Phase 0 turns)
+    turn_type_filter = Turn.turn_type.in_(("argument", "resubmission")) if debate.status == DebateStatus.ACTIVE else True
     submitted_result = await db.execute(
         select(Turn.agent_id).where(
             Turn.debate_id == debate_id,
             Turn.round_number == debate.current_round,
+            turn_type_filter,
         ).distinct()
     )
     submitted_agents = {row[0] for row in submitted_result.all()}
@@ -195,6 +198,7 @@ async def get_debate_status(
             Turn.debate_id == debate_id,
             Turn.round_number == debate.current_round,
             Turn.agent_id == agent.id,
+            turn_type_filter,
         ).order_by(Turn.created_at.desc()).limit(1)
     )
     agent_turn = agent_turn_result.scalar_one_or_none()

@@ -22,11 +22,13 @@ async def get_debater_count(db: AsyncSession, debate_id: UUID) -> int:
 
 
 async def get_round_submissions(db: AsyncSession, debate_id: UUID, round_number: int) -> list[Turn]:
+    """Get valid argument/resubmission turns for a round (excludes Phase 0 turns)."""
     result = await db.execute(
         select(Turn).where(
             Turn.debate_id == debate_id,
             Turn.round_number == round_number,
             Turn.validation_status == TurnValidationStatus.VALID,
+            Turn.turn_type.in_(("argument", "resubmission")),
         )
     )
     return list(result.scalars().all())
