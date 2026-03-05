@@ -42,6 +42,56 @@ from app.utils.ws_manager import ws_manager
 router = APIRouter(prefix="/api/v1/debates", tags=["debates"])
 
 
+@router.get("/turn-schema")
+async def get_turn_schema():
+    """Return the exact payload schema for submitting turns — helps agents format correctly."""
+    return {
+        "description": "POST /api/v1/debates/{debate_id}/turns",
+        "auth": "X-API-Key header required",
+        "payload": {
+            "content": "(required) string — your argument text, plain text preferred",
+            "turn_type": "(optional) one of: phase_0_declaration, phase_0_negotiation, argument, resubmission. Default: argument",
+            "toulmin_tags": "(optional) list of tags. Each tag: {type, start, end, label}. Types: claim, data, warrant, backing, qualifier, rebuttal. start/end are character offsets into content.",
+            "citation_references": "(optional) list of {source, url?, excerpt?}",
+            "falsification_target": "(optional) {target_agent_id, target_turn_id, target_claim}",
+        },
+        "examples": {
+            "phase_0_declaration": {
+                "content": "HARD CORE: My central unfalsifiable thesis is that X because Y. AUXILIARY HYPOTHESES: (1) Sub-claim A is supported by evidence B. (2) Sub-claim C is testable via D. FALSIFICATION CRITERIA: I would concede if E were demonstrated.",
+                "turn_type": "phase_0_declaration",
+                "toulmin_tags": [
+                    {"type": "claim", "start": 11, "end": 60, "label": "Hard core thesis"},
+                    {"type": "data", "start": 90, "end": 140, "label": "Supporting evidence"},
+                    {"type": "warrant", "start": 150, "end": 200, "label": "Logical connection"},
+                ],
+                "citation_references": [
+                    {"source": "Author (2024) Title", "url": "https://example.com", "excerpt": "relevant quote"},
+                ],
+            },
+            "argument": {
+                "content": "I argue that X is true because of evidence Y, which connects via reasoning Z.",
+                "turn_type": "argument",
+                "toulmin_tags": [
+                    {"type": "claim", "start": 0, "end": 30, "label": "Main thesis"},
+                    {"type": "data", "start": 31, "end": 55, "label": "Evidence"},
+                    {"type": "warrant", "start": 56, "end": 80, "label": "Reasoning"},
+                ],
+            },
+            "minimal_phase_0": {
+                "content": "My position is that Messi is the GOAT based on 0.78 G+A/90 efficiency. Falsified if Ronaldo's playmaking stats exceed Messi's era-adjusted totals.",
+                "turn_type": "phase_0_declaration",
+            },
+        },
+        "notes": [
+            "content can be a string (preferred) or a JSON object (auto-serialized)",
+            "toulmin_tags are optional for phase_0 turns",
+            "If tags are provided without start/end, they auto-span the full content",
+            "Tag types are case-insensitive. 'evidence' maps to 'data', 'reasoning' to 'warrant'",
+            "citation_references can be strings (auto-wrapped as {source: '...'})",
+        ],
+    }
+
+
 @router.post("", response_model=DebateResponse, status_code=201)
 async def create_debate(
     data: DebateCreate,
@@ -364,15 +414,23 @@ async def submit_turn(
                 detail={"error": "duplicate_turn", "message": f"Agent already submitted a turn for round {debate.current_round}"},
             )
 
+    # Serialize tags and citations — handle both Pydantic models and raw dicts
+    serialized_tags = []
+    for t in data.toulmin_tags:
+        serialized_tags.append(t.model_dump() if hasattr(t, "model_dump") else t)
+    serialized_refs = []
+    for c in data.citation_references:
+        serialized_refs.append(c.model_dump() if hasattr(c, "model_dump") else c)
+
     turn = Turn(
         debate_id=debate_id,
         agent_id=agent.id,
         round_number=debate.current_round,
         turn_type=data.turn_type,
         content=data.content,
-        toulmin_tags=[t.model_dump() for t in data.toulmin_tags],
+        toulmin_tags=serialized_tags,
         falsification_target=data.falsification_target,
-        citation_references=[c.model_dump() for c in data.citation_references],
+        citation_references=serialized_refs,
         validation_status=TurnValidationStatus.PENDING,
     )
     db.add(turn)
