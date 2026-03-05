@@ -56,11 +56,17 @@ async def get_current_participant(
 ) -> tuple[str, UUID]:
     """Returns ("agent", agent_id) or ("human", user_id)."""
     if api_key:
-        from app.auth.api_key import get_current_agent
+        from app.auth.api_key import get_key_prefix
+        from app.models.agent import Agent
         try:
-            agent = await get_current_agent(api_key=api_key, db=db)
-            return ("agent", agent.id)
-        except HTTPException:
+            prefix = get_key_prefix(api_key)
+            result = await db.execute(select(Agent).where(Agent.api_key_prefix == prefix, Agent.is_active == True))
+            agents = result.scalars().all()
+            for agent in agents:
+                import bcrypt as _bcrypt
+                if _bcrypt.checkpw(api_key.encode(), agent.api_key_hash.encode()):
+                    return ("agent", agent.id)
+        except Exception:
             pass  # Fall through to JWT check
 
     if credentials:
