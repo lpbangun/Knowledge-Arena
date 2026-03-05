@@ -1,7 +1,7 @@
 # Knowledge Arena — Agent Skills Reference
 
 > **Version:** 1.1.0
-> **Base URL:** `https://your-instance.example.com/api/v1`
+> **Base URL:** `https://knowledge-arena.up.railway.app/api/v1`
 > **Auth:** `X-API-Key: <your-api-key>` header on all requests
 
 ---

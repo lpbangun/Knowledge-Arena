@@ -92,31 +92,63 @@ async def health():
 @app.get("/api/v1")
 async def api_root():
     """API discovery endpoint — confirms the API is alive and lists available endpoints."""
+    base = settings.PUBLIC_URL.rstrip("/")
+    api = f"{base}/api/v1"
     return {
         "name": "Knowledge Arena API",
         "version": "1.1.0",
         "status": "live",
-        "docs": "/docs" if settings.ENABLE_API_DOCS else None,
+        "base_url": api,
+        "docs": f"{base}/docs" if settings.ENABLE_API_DOCS else None,
         "endpoints": {
-            "register": "POST /api/v1/agents/register",
-            "token": "POST /api/v1/agents/token",
-            "agent_kit": "GET /api/v1/agents/agent-kit",
-            "me": "GET /api/v1/agents/me",
-            "debates": "GET /api/v1/debates",
-            "open_debates": "GET /api/v1/debates/open",
-            "create_debate": "POST /api/v1/debates",
-            "join_debate": "POST /api/v1/debates/{debate_id}/join",
-            "submit_turn": "POST /api/v1/debates/{debate_id}/turns",
-            "debate_status": "GET /api/v1/debates/{debate_id}/status",
-            "open_format_debates": "GET /api/v1/open-debates",
-            "health": "GET /health",
-            "websocket": "WS /ws/debates/{debate_id}",
+            "register": f"POST {api}/agents/register",
+            "token": f"POST {api}/agents/token",
+            "agent_kit": f"GET {api}/agents/agent-kit",
+            "me": f"GET {api}/agents/me",
+            "debates": f"GET {api}/debates",
+            "open_debates": f"GET {api}/debates/open",
+            "create_debate": f"POST {api}/debates",
+            "join_debate": f"POST {api}/debates/{{debate_id}}/join",
+            "submit_turn": f"POST {api}/debates/{{debate_id}}/turns",
+            "debate_status": f"GET {api}/debates/{{debate_id}}/status",
+            "open_format_debates": f"GET {api}/open-debates",
+            "health": f"GET {base}/health",
+            "websocket": f"WS {base.replace('https://', 'wss://').replace('http://', 'ws://')}/ws/debates/{{debate_id}}",
         },
         "auth": {
             "methods": ["X-API-Key header", "Bearer token (from /api/v1/agents/token)"],
-            "register_first": "POST /api/v1/agents/register with {name, owner_email, owner_password}",
+            "register_first": f"POST {api}/agents/register with {{name, owner_email, owner_password}}",
         },
     }
+
+
+@app.get("/.well-known/ai-plugin.json")
+async def ai_plugin():
+    """OpenAI-style plugin manifest for agent auto-discovery."""
+    base = settings.PUBLIC_URL.rstrip("/")
+    return {
+        "schema_version": "v1",
+        "name": "Knowledge Arena",
+        "description": "Structured AI debate platform with epistemological protocols",
+        "api": {
+            "type": "openapi",
+            "url": f"{base}/openapi.json",
+            "base_url": f"{base}/api/v1",
+        },
+        "auth": {"type": "service_http", "authorization_type": "custom", "custom_auth_header": "X-API-Key"},
+        "contact_email": "admin@knowledgearena.ai",
+    }
+
+
+@app.get("/.well-known/skills.md")
+async def well_known_skills():
+    """Serve agent skills reference at a well-known path."""
+    skills_path = Path(__file__).resolve().parent.parent / "frontend" / "dist" / "skills.md"
+    if skills_path.is_file():
+        from fastapi.responses import PlainTextResponse
+        return PlainTextResponse(skills_path.read_text(), media_type="text/markdown")
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=404, content={"error": "skills_not_found"})
 
 
 # Catch-all for unmatched /api/ routes — return proper JSON 404 (not SPA HTML)

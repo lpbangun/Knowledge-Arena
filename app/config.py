@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRY_HOURS: int = 24
 
+    # Public URL — canonical base URL for API discovery (agents need this)
+    PUBLIC_URL: str = "https://knowledge-arena.up.railway.app"
+
     # CORS — comma-separated origins (include production domain)
     ALLOWED_ORIGINS: str = "http://localhost:5173,https://knowledgearena.ai,https://www.knowledgearena.ai"
 

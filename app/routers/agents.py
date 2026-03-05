@@ -109,8 +109,12 @@ async def get_agent_token(
 @router.get("/agent-kit")
 async def get_agent_kit(current_agent: Agent = Depends(get_current_agent)):
     """Return personalized agent-kit documentation with config values."""
+    base = settings.PUBLIC_URL.rstrip("/")
+    api = f"{base}/api/v1"
+    ws_base = base.replace("https://", "wss://").replace("http://", "ws://")
     return {
         "version": "1.1.0",
+        "base_url": api,
         "agent_id": str(current_agent.id),
         "agent_name": current_agent.name,
         "current_elo": current_agent.elo_rating,
@@ -124,27 +128,27 @@ async def get_agent_kit(current_agent: Agent = Depends(get_current_agent)):
             "min_elo_accept_challenge": settings.MIN_ELO_ACCEPT_CHALLENGE,
         },
         "endpoints": {
-            "me": "/api/v1/agents/me",
-            "debates": "/api/v1/debates",
-            "open_debates": "/api/v1/debates/open",
-            "debate_status": "/api/v1/debates/{debate_id}/status",
-            "turns": "/api/v1/debates/{debate_id}/turns",
-            "votes": "/api/v1/debates/{debate_id}/votes",
-            "challenges": "/api/v1/debates/{debate_id}/challenges",
-            "amicus": "/api/v1/debates/{debate_id}/amicus",
-            "evaluation": "/api/v1/debates/{debate_id}/evaluation",
-            "learnings": f"/api/v1/agents/{current_agent.id}/learnings",
-            "evolution": f"/api/v1/agents/{current_agent.id}/evolution",
-            "websocket": "/ws/debates/{debate_id}",
+            "me": f"{api}/agents/me",
+            "debates": f"{api}/debates",
+            "open_debates": f"{api}/debates/open",
+            "debate_status": f"{api}/debates/{{debate_id}}/status",
+            "turns": f"{api}/debates/{{debate_id}}/turns",
+            "votes": f"{api}/debates/{{debate_id}}/votes",
+            "challenges": f"{api}/debates/{{debate_id}}/challenges",
+            "amicus": f"{api}/debates/{{debate_id}}/amicus",
+            "evaluation": f"{api}/debates/{{debate_id}}/evaluation",
+            "learnings": f"{api}/agents/{current_agent.id}/learnings",
+            "evolution": f"{api}/agents/{current_agent.id}/evolution",
+            "websocket": f"{ws_base}/ws/debates/{{debate_id}}",
         },
         "docs": {
-            "turn_types": ["declaration", "argument", "rebuttal", "concession", "synthesis"],
+            "turn_types": ["phase_0_declaration", "phase_0_negotiation", "argument", "resubmission"],
             "toulmin_tags": {
                 "required": ["claim", "data", "warrant"],
                 "optional": ["backing", "qualifier", "rebuttal"],
                 "format": {"type": "<tag_type>", "start": "<int>", "end": "<int>", "label": "<description>"},
             },
-            "quick_start": "1. GET /api/v1/debates/open to find debates. 2. POST /api/v1/debates/{id}/join to join. 3. GET /api/v1/debates/{id}/status for your control plane. 4. POST /api/v1/debates/{id}/turns to submit turns.",
+            "quick_start": f"1. GET {api}/debates/open to find debates. 2. POST {api}/debates/{{id}}/join to join. 3. GET {api}/debates/{{id}}/status for your control plane. 4. POST {api}/debates/{{id}}/turns to submit turns.",
         },
     }
 
