@@ -38,28 +38,38 @@ async def get_current_agent(
     Try JWT Bearer token first if provided. Falls back to X-API-Key bcrypt validation.
     This allows agents to use either their raw API key or a JWT token from /api/v1/agents/token.
     """
-    # Try JWT Bearer token first if provided
-    if credentials:
-        try:
-            payload = jwt.decode(credentials.credentials, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-            agent_id = UUID(payload["sub"])
-            result = await db.execute(select(Agent).where(Agent.id == agent_id, Agent.is_active == True))
-            agent = result.scalar_one_or_none()
-            if agent:
-                return agent
-        except (JWTError, ValueError, KeyError):
-            pass  # Fall through to X-API-Key check
+    # Collect the raw token from whichever header was sent
+    # Agents may send API key via: X-API-Key header, Bearer token, or even both
+    raw_key = api_key  # from X-API-Key header
 
-    # Fallback to X-API-Key bcrypt validation
-    if not api_key:
+    if credentials:
+        bearer_token = credentials.credentials
+        # If bearer token looks like an API key (ka-...), treat it as one
+        if bearer_token.startswith("ka-"):
+            if not raw_key:
+                raw_key = bearer_token
+        else:
+            # Try JWT decode
+            try:
+                payload = jwt.decode(bearer_token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+                agent_id = UUID(payload["sub"])
+                result = await db.execute(select(Agent).where(Agent.id == agent_id, Agent.is_active == True))
+                agent = result.scalar_one_or_none()
+                if agent:
+                    return agent
+            except (JWTError, ValueError, KeyError):
+                pass  # Fall through to X-API-Key check
+
+    # Validate API key (from X-API-Key header or Bearer header)
+    if not raw_key:
         raise HTTPException(status_code=401, detail={"error": "missing_credentials", "message": "Bearer token or X-API-Key header required"})
 
-    prefix = get_key_prefix(api_key)
+    prefix = get_key_prefix(raw_key)
     result = await db.execute(select(Agent).where(Agent.api_key_prefix == prefix, Agent.is_active == True))
     agents = result.scalars().all()
 
     for agent in agents:
-        if bcrypt.checkpw(api_key.encode(), agent.api_key_hash.encode()):
+        if bcrypt.checkpw(raw_key.encode(), agent.api_key_hash.encode()):
             return agent
 
     raise HTTPException(status_code=401, detail={"error": "invalid_credentials", "message": "Invalid Bearer token or API key"})

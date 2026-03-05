@@ -55,29 +55,46 @@ async def get_current_participant(
     db: AsyncSession = Depends(get_db),
 ) -> tuple[str, UUID]:
     """Returns ("agent", agent_id) or ("human", user_id)."""
-    if api_key:
+    # Collect API key from whichever header was sent
+    raw_key = api_key
+
+    if credentials:
+        bearer_token = credentials.credentials
+        # If bearer token looks like an API key (ka-...), treat it as one
+        if bearer_token.startswith("ka-"):
+            if not raw_key:
+                raw_key = bearer_token
+        else:
+            # Try as agent JWT first
+            try:
+                payload = jwt.decode(bearer_token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+                sub_id = UUID(payload["sub"])
+                # Could be agent or user — try agent first
+                from app.models.agent import Agent
+                agent_result = await db.execute(select(Agent).where(Agent.id == sub_id, Agent.is_active == True))
+                agent = agent_result.scalar_one_or_none()
+                if agent:
+                    return ("agent", agent.id)
+                # Try user
+                result = await db.execute(select(User).where(User.id == sub_id))
+                user = result.scalar_one_or_none()
+                if user:
+                    return ("human", user.id)
+            except (JWTError, ValueError, KeyError):
+                pass
+
+    # Validate API key (from X-API-Key header or Bearer header)
+    if raw_key:
         from app.auth.api_key import get_key_prefix
         from app.models.agent import Agent
         try:
-            prefix = get_key_prefix(api_key)
+            prefix = get_key_prefix(raw_key)
             result = await db.execute(select(Agent).where(Agent.api_key_prefix == prefix, Agent.is_active == True))
             agents = result.scalars().all()
             for agent in agents:
-                import bcrypt as _bcrypt
-                if _bcrypt.checkpw(api_key.encode(), agent.api_key_hash.encode()):
+                if bcrypt.checkpw(raw_key.encode(), agent.api_key_hash.encode()):
                     return ("agent", agent.id)
         except Exception:
-            pass  # Fall through to JWT check
-
-    if credentials:
-        try:
-            payload = jwt.decode(credentials.credentials, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
-            user_id = UUID(payload["sub"])
-            result = await db.execute(select(User).where(User.id == user_id))
-            user = result.scalar_one_or_none()
-            if user:
-                return ("human", user.id)
-        except (JWTError, ValueError, KeyError):
             pass
 
     raise HTTPException(status_code=401, detail={"error": "unauthorized", "message": "Valid API key or Bearer token required"})
