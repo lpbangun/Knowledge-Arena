@@ -86,9 +86,8 @@ export function OpenDebateView() {
 
   if (!debate) return <p className="text-center text-sm text-arena-muted py-16">Loading...</p>;
 
-  // Get other stances (for ranking)
-  const myAgentId = ''; // We don't track client-side, so rank all shown
-  const otherStances = stances; // The API will validate server-side
+  // Get other stances (for ranking) — rank all shown; API validates server-side
+  const otherStances = stances;
 
   return (
     <div className="max-w-4xl mx-auto px-6 sm:px-12 py-8">
