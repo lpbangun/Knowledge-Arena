@@ -155,6 +155,46 @@ async def get_me(current_agent: Agent = Depends(get_current_agent)):
     return current_agent
 
 
+@router.get("/count")
+async def get_agent_count(db: AsyncSession = Depends(get_db)):
+    """Return the total number of registered active agents."""
+    result = await db.execute(select(sa_func.count()).select_from(Agent).where(Agent.is_active == True))
+    count = result.scalar() or 0
+    return {"count": count}
+
+
+@router.get("/leaderboard/top", response_model=CursorPage[AgentLeaderboardEntry])
+async def get_leaderboard(
+    category: Optional[str] = None,
+    cursor: Optional[str] = None,
+    limit: int = Query(default=50, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+):
+    query = select(Agent).where(Agent.is_active == True).order_by(Agent.elo_rating.desc())
+
+    if cursor:
+        cursor_id = decode_cursor(cursor)
+        cursor_agent = await db.execute(select(Agent).where(Agent.id == cursor_id))
+        ca = cursor_agent.scalar_one_or_none()
+        if ca:
+            query = query.where(
+                (Agent.elo_rating < ca.elo_rating) | ((Agent.elo_rating == ca.elo_rating) & (Agent.id > ca.id))
+            )
+
+    result = await db.execute(query.limit(limit + 1))
+    agents = list(result.scalars().all())
+
+    has_more = len(agents) > limit
+    items = agents[:limit]
+    next_cursor = encode_cursor(items[-1].id) if has_more and items else None
+
+    return CursorPage(
+        items=[AgentLeaderboardEntry.model_validate(a) for a in items],
+        next_cursor=next_cursor,
+        has_more=has_more,
+    )
+
+
 @router.get("/{agent_id}", response_model=AgentResponse)
 async def get_agent(agent_id: UUID, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(Agent).where(Agent.id == agent_id))
@@ -219,46 +259,6 @@ async def get_elo_history(agent_id: UUID, db: AsyncSession = Depends(get_db)):
     if not agent:
         raise HTTPException(status_code=404, detail={"error": "agent_not_found", "message": f"Agent {agent_id} does not exist"})
     return {"agent_id": str(agent_id), "current_elo": agent.elo_rating, "history": agent.elo_history}
-
-
-@router.get("/count")
-async def get_agent_count(db: AsyncSession = Depends(get_db)):
-    """Return the total number of registered active agents."""
-    result = await db.execute(select(sa_func.count()).select_from(Agent).where(Agent.is_active == True))
-    count = result.scalar() or 0
-    return {"count": count}
-
-
-@router.get("/leaderboard/top", response_model=CursorPage[AgentLeaderboardEntry])
-async def get_leaderboard(
-    category: Optional[str] = None,
-    cursor: Optional[str] = None,
-    limit: int = Query(default=50, ge=1, le=100),
-    db: AsyncSession = Depends(get_db),
-):
-    query = select(Agent).where(Agent.is_active == True).order_by(Agent.elo_rating.desc())
-
-    if cursor:
-        cursor_id = decode_cursor(cursor)
-        cursor_agent = await db.execute(select(Agent).where(Agent.id == cursor_id))
-        ca = cursor_agent.scalar_one_or_none()
-        if ca:
-            query = query.where(
-                (Agent.elo_rating < ca.elo_rating) | ((Agent.elo_rating == ca.elo_rating) & (Agent.id > ca.id))
-            )
-
-    result = await db.execute(query.limit(limit + 1))
-    agents = list(result.scalars().all())
-
-    has_more = len(agents) > limit
-    items = agents[:limit]
-    next_cursor = encode_cursor(items[-1].id) if has_more and items else None
-
-    return CursorPage(
-        items=[AgentLeaderboardEntry.model_validate(a) for a in items],
-        next_cursor=next_cursor,
-        has_more=has_more,
-    )
 
 
 @router.get("/{agent_id}/evolution")

@@ -20,11 +20,11 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRY_HOURS: int = 24
 
-    # CORS
-    ALLOWED_ORIGINS: str = "http://localhost:5173"
+    # CORS — comma-separated origins (include production domain)
+    ALLOWED_ORIGINS: str = "http://localhost:5173,https://knowledgearena.ai,https://www.knowledgearena.ai"
 
-    # API docs (disable in production)
-    ENABLE_API_DOCS: bool = False
+    # API docs (enabled by default — agents need discovery)
+    ENABLE_API_DOCS: bool = True
 
     # Platform config
     DEFAULT_MAX_ROUNDS: int = 10

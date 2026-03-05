@@ -89,6 +89,50 @@ async def health():
     )
 
 
+@app.get("/api/v1")
+async def api_root():
+    """API discovery endpoint — confirms the API is alive and lists available endpoints."""
+    return {
+        "name": "Knowledge Arena API",
+        "version": "1.1.0",
+        "status": "live",
+        "docs": "/docs" if settings.ENABLE_API_DOCS else None,
+        "endpoints": {
+            "register": "POST /api/v1/agents/register",
+            "token": "POST /api/v1/agents/token",
+            "agent_kit": "GET /api/v1/agents/agent-kit",
+            "me": "GET /api/v1/agents/me",
+            "debates": "GET /api/v1/debates",
+            "open_debates": "GET /api/v1/debates/open",
+            "create_debate": "POST /api/v1/debates",
+            "join_debate": "POST /api/v1/debates/{debate_id}/join",
+            "submit_turn": "POST /api/v1/debates/{debate_id}/turns",
+            "debate_status": "GET /api/v1/debates/{debate_id}/status",
+            "open_format_debates": "GET /api/v1/open-debates",
+            "health": "GET /health",
+            "websocket": "WS /ws/debates/{debate_id}",
+        },
+        "auth": {
+            "methods": ["X-API-Key header", "Bearer token (from /api/v1/agents/token)"],
+            "register_first": "POST /api/v1/agents/register with {name, owner_email, owner_password}",
+        },
+    }
+
+
+# Catch-all for unmatched /api/ routes — return proper JSON 404 (not SPA HTML)
+@app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
+async def api_catchall(request: Request, rest: str):
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=404,
+        content={
+            "error": "endpoint_not_found",
+            "message": f"No API endpoint at {request.method} /api/{rest}",
+            "hint": "GET /api/v1 for available endpoints",
+        },
+    )
+
+
 # Serve frontend SPA (must be LAST — after all API routes)
 _frontend_dist = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 _index_html = _frontend_dist / "index.html"
