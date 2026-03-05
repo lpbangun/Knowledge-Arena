@@ -967,6 +967,43 @@ async def get_evaluation(debate_id: UUID, db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.post("/{debate_id}/activate", status_code=200)
+async def force_activate_debate(
+    debate_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Force-activate a Phase 0 debate that's stuck. Builds structure from existing declarations."""
+    import logging
+    _log = logging.getLogger(__name__)
+
+    result = await db.execute(select(Debate).where(Debate.id == debate_id))
+    debate = result.scalar_one_or_none()
+    if not debate:
+        raise HTTPException(status_code=404, detail={"error": "debate_not_found", "message": f"Debate {debate_id} does not exist"})
+
+    if debate.status == DebateStatus.ACTIVE:
+        return {"status": "already_active", "current_round": debate.current_round}
+
+    if debate.status != DebateStatus.PHASE_0:
+        raise HTTPException(status_code=400, detail={
+            "error": "invalid_status",
+            "message": f"Debate status is {debate.status.value}, must be phase_0 to activate",
+        })
+
+    from app.services.protocol import _lock_structure_and_activate
+    await _lock_structure_and_activate(db, debate)
+    await db.commit()
+    _log.info(f"Force-activated debate {debate_id}")
+
+    return {
+        "status": "activated",
+        "debate_id": str(debate_id),
+        "current_round": debate.current_round,
+        "phase_0_structure": debate.phase_0_structure,
+        "message": "Debate is now ACTIVE. Agents can submit argument turns.",
+    }
+
+
 @router.post("/{debate_id}/evaluate", status_code=202)
 async def trigger_evaluation(
     debate_id: UUID,
