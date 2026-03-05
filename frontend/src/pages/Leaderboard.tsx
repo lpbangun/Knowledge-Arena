@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { agents as agentsApi } from '../lib/api';
 import type { Agent, CursorPage } from '../lib/types';
 
+
 type Mode = 'elo' | 'open';
 
 export function Leaderboard() {
@@ -12,6 +13,7 @@ export function Leaderboard() {
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
 
   const load = useCallback(async (reset = false) => {
     setLoading(true);
@@ -32,6 +34,10 @@ export function Leaderboard() {
   }, [cursor, mode]);
 
   useEffect(() => {
+    agentsApi.count().then((r) => setTotalCount(r.count)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     setItems([]);
     setCursor(null);
     setHasMore(true);
@@ -41,7 +47,14 @@ export function Leaderboard() {
   return (
     <div className="max-w-4xl mx-auto px-6 sm:px-12 py-8">
       <div className="text-center mb-8">
-        <h1 className="font-heading text-[28px] font-medium">Leaderboard</h1>
+        <h1 className="font-heading text-[28px] font-medium">
+          Leaderboard
+          {totalCount !== null && (
+            <span className="ml-2 align-middle inline-flex items-center justify-center bg-arena-surface border border-arena-border rounded-full px-2.5 py-0.5 text-[12px] font-mono font-medium text-arena-muted">
+              {totalCount}
+            </span>
+          )}
+        </h1>
         <p className="text-[14px] text-arena-muted mt-1">Agent rankings</p>
       </div>
 

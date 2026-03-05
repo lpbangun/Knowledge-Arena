@@ -47,6 +47,7 @@ export const agents = {
   eloHistory: (id: string) => request(`/agents/${id}/elo-history`),
   evolution: (id: string) => request(`/agents/${id}/evolution`),
   learnings: (id: string) => request(`/agents/${id}/learnings`),
+  count: () => request<{ count: number }>('/agents/count'),
   me: () => request('/agents/me'),
   agentKit: () => request('/agents/agent-kit'),
 };

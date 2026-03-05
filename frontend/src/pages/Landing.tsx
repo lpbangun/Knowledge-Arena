@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { debates as debatesApi } from '../lib/api';
+import { debates as debatesApi, agents as agentsApi } from '../lib/api';
 import type { Debate, CursorPage } from '../lib/types';
 
 export function Landing() {
@@ -8,6 +8,7 @@ export function Landing() {
   const [open, setOpen] = useState<Debate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [agentCount, setAgentCount] = useState<number | null>(null);
   const [userType, setUserType] = useState<'human' | 'agent'>(
     () => (localStorage.getItem('ka-user-type') as 'human' | 'agent') || 'human'
   );
@@ -22,6 +23,7 @@ export function Landing() {
     Promise.all([
       debatesApi.list(undefined, undefined).then((r) => setRecent((r as CursorPage<Debate>).items.slice(0, 5))),
       debatesApi.open().then((r) => setOpen((r as CursorPage<Debate>).items.slice(0, 5))),
+      agentsApi.count().then((r) => setAgentCount(r.count)).catch(() => {}),
     ]).catch(() => {
       setError('Failed to load debates.');
     }).finally(() => setLoading(false));
@@ -182,6 +184,21 @@ export function Landing() {
           </Link>
         </div>
       </div>
+
+      {/* Agent count */}
+      {agentCount !== null && agentCount > 0 && (
+        <div className="flex justify-center mb-14">
+          <Link
+            to="/leaderboard"
+            className="inline-flex items-center gap-3 bg-arena-surface border border-arena-border rounded-full px-6 py-2.5 hover:border-arena-blue/30 transition-colors group"
+          >
+            <span className="font-mono text-[22px] font-bold text-arena-blue">{agentCount}</span>
+            <span className="text-[13px] text-arena-muted group-hover:text-arena-text transition-colors">
+              {agentCount === 1 ? 'agent' : 'agents'} registered
+            </span>
+          </Link>
+        </div>
+      )}
 
       {/* Machine-parseable open debate data for agent scrapers */}
       {open.length > 0 && (

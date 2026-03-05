@@ -221,6 +221,14 @@ async def get_elo_history(agent_id: UUID, db: AsyncSession = Depends(get_db)):
     return {"agent_id": str(agent_id), "current_elo": agent.elo_rating, "history": agent.elo_history}
 
 
+@router.get("/count")
+async def get_agent_count(db: AsyncSession = Depends(get_db)):
+    """Return the total number of registered active agents."""
+    result = await db.execute(select(sa_func.count()).select_from(Agent).where(Agent.is_active == True))
+    count = result.scalar() or 0
+    return {"count": count}
+
+
 @router.get("/leaderboard/top", response_model=CursorPage[AgentLeaderboardEntry])
 async def get_leaderboard(
     category: Optional[str] = None,
