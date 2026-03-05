@@ -59,7 +59,33 @@ app.include_router(ws.router)
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "version": "1.1.0"}
+    checks = {"db": "ok", "redis": "ok"}
+    status_code = 200
+
+    # Ping PostgreSQL
+    try:
+        from sqlalchemy import text
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception as e:
+        checks["db"] = f"error: {str(e)[:100]}"
+        status_code = 503
+
+    # Ping Redis
+    try:
+        import redis.asyncio as aioredis
+        r = aioredis.from_url(settings.REDIS_URL, socket_connect_timeout=2)
+        await r.ping()
+        await r.aclose()
+    except Exception as e:
+        checks["redis"] = f"error: {str(e)[:100]}"
+        status_code = 503
+
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        content={"status": "ok" if status_code == 200 else "degraded", "version": "1.1.0", "checks": checks},
+        status_code=status_code,
+    )
 
 
 # Serve frontend SPA (must be LAST — after all API routes)
