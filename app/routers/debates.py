@@ -896,19 +896,19 @@ async def trigger_evaluation(
             "message": f"Debate status is {debate.status.value}, must be COMPLETED, CONVERGED, or EVALUATION_FAILED",
         })
 
-    # Try Celery first, fall back to inline
-    try:
-        evaluate_debate.delay(str(debate_id))
-        return {"status": "queued", "method": "celery"}
-    except Exception as e:
-        _log.warning(f"Celery unavailable for manual evaluate_debate on {debate_id}: {e}")
-
+    # Always run inline first (Celery worker may not be running in single-service deploy)
     try:
         from app.tasks.arbiter_tasks import _evaluate_debate_async
         await _evaluate_debate_async(str(debate_id))
         return {"status": "completed", "method": "inline"}
     except Exception as e:
         _log.error(f"Inline evaluation failed for {debate_id}: {e}")
+        # Try Celery as fallback
+        try:
+            evaluate_debate.delay(str(debate_id))
+            return {"status": "queued", "method": "celery"}
+        except Exception as ce:
+            _log.error(f"Celery also failed for {debate_id}: {ce}")
         raise HTTPException(status_code=500, detail={
             "error": "evaluation_failed",
             "message": f"Evaluation failed: {str(e)[:200]}",

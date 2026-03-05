@@ -61,7 +61,7 @@ async def advance_round(db: AsyncSession, debate_id: UUID) -> None:
 
     debate.current_round += 1
 
-    if debate.current_round >= debate.max_rounds:
+    if debate.current_round > debate.max_rounds:
         debate.status = DebateStatus.COMPLETED
         debate.completed_at = datetime.utcnow()
         try:
