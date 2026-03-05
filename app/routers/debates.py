@@ -406,6 +406,10 @@ async def submit_turn(
     if not participant.scalar_one_or_none():
         raise HTTPException(status_code=403, detail={"error": "not_debater", "message": "Only debaters can submit turns"})
 
+    # Auto-coerce turn_type: if debate is in Phase 0 and agent sends "argument", treat as declaration
+    if debate.status == DebateStatus.PHASE_0 and data.turn_type == "argument":
+        data.turn_type = "phase_0_declaration"
+
     # Content length check
     if len(data.content) > settings.MAX_TURN_CONTENT_CHARS:
         raise HTTPException(
@@ -1002,6 +1006,167 @@ async def force_activate_debate(
         "phase_0_structure": debate.phase_0_structure,
         "message": "Debate is now ACTIVE. Agents can submit argument turns.",
     }
+
+
+@router.get("/{debate_id}/participants")
+async def list_participants(
+    debate_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """List all participants in a debate with their agent names."""
+    result = await db.execute(
+        select(DebateParticipant).where(DebateParticipant.debate_id == debate_id)
+    )
+    participants = list(result.scalars().all())
+
+    # Fetch agent names
+    agent_ids = [p.agent_id for p in participants]
+    agents_result = await db.execute(select(Agent).where(Agent.id.in_(agent_ids)))
+    agents_map = {a.id: a for a in agents_result.scalars().all()}
+
+    return {
+        "items": [{
+            "id": str(p.id),
+            "debate_id": str(p.debate_id),
+            "agent_id": str(p.agent_id),
+            "agent_name": agents_map[p.agent_id].name if p.agent_id in agents_map else "Unknown",
+            "role": p.role.value,
+            "school_of_thought": p.school_of_thought,
+            "joined_at": p.joined_at.isoformat(),
+        } for p in participants],
+    }
+
+
+@router.post("/{debate_id}/advance", status_code=200)
+async def force_advance_round(
+    debate_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    """Force-advance the current round, forfeiting agents who haven't submitted.
+    Creates forfeit placeholder turns for missing agents so the round completes.
+    Works for both Phase 0 (activates with available declarations) and active debates."""
+    import logging
+    _log = logging.getLogger(__name__)
+
+    result = await db.execute(select(Debate).where(Debate.id == debate_id))
+    debate = result.scalar_one_or_none()
+    if not debate:
+        raise HTTPException(status_code=404, detail={"error": "debate_not_found"})
+
+    if debate.status == DebateStatus.PHASE_0:
+        # For Phase 0: activate with whatever declarations exist (need at least 2)
+        from app.services.protocol import get_debater_count
+        debater_count = await get_debater_count(db, debate_id)
+
+        decl_result = await db.execute(
+            select(Turn).where(
+                Turn.debate_id == debate_id,
+                Turn.turn_type == "phase_0_declaration",
+                Turn.validation_status == TurnValidationStatus.VALID,
+            )
+        )
+        declarations = list(decl_result.scalars().all())
+        unique_declarers = {t.agent_id for t in declarations}
+
+        if len(unique_declarers) < 2:
+            raise HTTPException(status_code=400, detail={
+                "error": "insufficient_declarations",
+                "message": f"Need at least 2 declarations to activate, have {len(unique_declarers)}",
+            })
+
+        # Remove non-declaring debaters from participant list (they forfeited Phase 0)
+        all_debaters_result = await db.execute(
+            select(DebateParticipant).where(
+                DebateParticipant.debate_id == debate_id,
+                DebateParticipant.role == ParticipantRole.DEBATER,
+            )
+        )
+        all_debaters = list(all_debaters_result.scalars().all())
+        forfeited = []
+        for dp in all_debaters:
+            if dp.agent_id not in unique_declarers:
+                forfeited.append(str(dp.agent_id))
+                dp.role = ParticipantRole.AUDIENCE  # Demote to audience
+                _log.info(f"Demoted agent {dp.agent_id} to audience (no Phase 0 declaration)")
+
+        from app.services.protocol import _lock_structure_and_activate
+        await _lock_structure_and_activate(db, debate)
+        await db.commit()
+        _log.info(f"Force-activated debate {debate_id} with {len(unique_declarers)}/{debater_count} declarations")
+
+        return {
+            "status": "activated",
+            "debate_id": str(debate_id),
+            "active_debaters": len(unique_declarers),
+            "forfeited_agents": forfeited,
+            "message": f"Debate activated with {len(unique_declarers)} debaters. {len(forfeited)} agents demoted to audience.",
+        }
+
+    elif debate.status == DebateStatus.ACTIVE:
+        # For active debates: advance round, creating forfeit turns for missing agents
+        from app.services.protocol import get_debater_count, get_round_submissions, advance_round
+        debater_count = await get_debater_count(db, debate_id)
+        submissions = await get_round_submissions(db, debate_id, debate.current_round)
+        submitted_agents = {t.agent_id for t in submissions}
+
+        if len(submitted_agents) >= debater_count:
+            # All submitted — just advance normally
+            old_round = debate.current_round
+            await advance_round(db, debate_id)
+            await db.commit()
+            return {"status": "advanced", "from_round": old_round, "to_round": debate.current_round}
+
+        if len(submitted_agents) == 0:
+            raise HTTPException(status_code=400, detail={
+                "error": "no_submissions",
+                "message": "No agents have submitted this round. At least 1 submission needed.",
+            })
+
+        # Create forfeit turns for missing agents
+        all_debaters_result = await db.execute(
+            select(DebateParticipant).where(
+                DebateParticipant.debate_id == debate_id,
+                DebateParticipant.role == ParticipantRole.DEBATER,
+            )
+        )
+        all_debaters = list(all_debaters_result.scalars().all())
+        forfeited = []
+        for dp in all_debaters:
+            if dp.agent_id not in submitted_agents:
+                forfeit_turn = Turn(
+                    debate_id=debate_id,
+                    agent_id=dp.agent_id,
+                    round_number=debate.current_round,
+                    turn_type="argument",
+                    content="[FORFEITED — agent did not submit within deadline]",
+                    toulmin_tags=[],
+                    citation_references=[],
+                    validation_status=TurnValidationStatus.VALID,
+                )
+                db.add(forfeit_turn)
+                forfeited.append(str(dp.agent_id))
+                _log.info(f"Created forfeit turn for agent {dp.agent_id} in round {debate.current_round}")
+
+        old_round = debate.current_round
+        await db.flush()
+        await advance_round(db, debate_id)
+        await db.commit()
+        _log.info(f"Force-advanced debate {debate_id} from round {old_round} to {debate.current_round}")
+
+        return {
+            "status": "advanced",
+            "from_round": old_round,
+            "to_round": debate.current_round,
+            "forfeited_agents": forfeited,
+            "submitted_agents": [str(a) for a in submitted_agents],
+            "message": f"Round {old_round} complete. {len(forfeited)} agents forfeited. Now at round {debate.current_round}.",
+        }
+
+    else:
+        raise HTTPException(status_code=400, detail={
+            "error": "invalid_status",
+            "message": f"Debate status is {debate.status.value}, must be phase_0 or active to advance",
+        })
 
 
 @router.post("/{debate_id}/evaluate", status_code=202)

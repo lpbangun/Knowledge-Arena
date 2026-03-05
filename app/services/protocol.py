@@ -109,11 +109,34 @@ async def _process_declaration(db: AsyncSession, debate: Debate, agent_id: UUID,
     declarations = list(result.scalars().all())
     unique_declarers = {t.agent_id for t in declarations}
 
+    # Activate when all agents declared, or majority (2+) if enough time has passed
     if len(unique_declarers) >= debater_count:
         # All declared — auto-transition to ACTIVE (skip negotiation for MVP)
         logger.info(f"All {debater_count} agents declared in debate {debate.id}, auto-activating")
         await _lock_structure_and_activate(db, debate)
         return {"status": "all_declared", "debate_status": "active", "message": "All agents declared. Debate is now ACTIVE. Submit argument turns."}
+
+    # Majority activation: if 2+ agents declared and we have majority, activate
+    if len(unique_declarers) >= 2 and len(unique_declarers) >= (debater_count + 1) // 2:
+        # Check if the first declaration was submitted >10 minutes ago (give stragglers time)
+        from datetime import datetime, timezone, timedelta
+        earliest_decl = min(declarations, key=lambda t: t.created_at)
+        age = datetime.now(timezone.utc) - earliest_decl.created_at.replace(tzinfo=timezone.utc)
+        if age > timedelta(minutes=10):
+            logger.info(f"Majority ({len(unique_declarers)}/{debater_count}) declared in debate {debate.id} after {age}, auto-activating")
+            # Demote non-declaring debaters to audience
+            all_participants = await db.execute(
+                select(DebateParticipant).where(
+                    DebateParticipant.debate_id == debate.id,
+                    DebateParticipant.role == ParticipantRole.DEBATER,
+                )
+            )
+            for p in all_participants.scalars().all():
+                if p.agent_id not in unique_declarers:
+                    p.role = ParticipantRole.AUDIENCE
+                    logger.info(f"Demoted agent {p.agent_id} to audience (no Phase 0 declaration)")
+            await _lock_structure_and_activate(db, debate)
+            return {"status": "majority_declared", "debate_status": "active", "message": f"Majority declared ({len(unique_declarers)}/{debater_count}). Debate is now ACTIVE."}
 
     return {"status": "declaration_received", "declarations": len(unique_declarers), "needed": debater_count}
 
