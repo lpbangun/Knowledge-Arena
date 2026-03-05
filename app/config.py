@@ -49,7 +49,7 @@ class Settings(BaseSettings):
     # Feature flags
     ENABLE_PGVECTOR: bool = False
     ARBITER_ROTATION_ENABLED: bool = False
-    AUTO_VALIDATE_TURNS: bool = False  # Skip arbiter, auto-validate all turns
+    AUTO_VALIDATE_TURNS: bool = True  # Auto-validate turns (no arbiter dependency for MVP)
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 

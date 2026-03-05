@@ -98,21 +98,22 @@ async def _process_declaration(db: AsyncSession, debate: Debate, agent_id: UUID,
     """Process a Phase 0 declaration — agent declares hard core + auxiliaries."""
     debater_count = await get_debater_count(db, debate.id)
 
-    # Count declarations in current round
+    # Count declarations across ALL rounds (agents may have declared at different rounds)
     result = await db.execute(
         select(Turn).where(
             Turn.debate_id == debate.id,
-            Turn.round_number == 0,
             Turn.turn_type == "phase_0_declaration",
+            Turn.validation_status == TurnValidationStatus.VALID,
         )
     )
     declarations = list(result.scalars().all())
     unique_declarers = {t.agent_id for t in declarations}
 
     if len(unique_declarers) >= debater_count:
-        # All declared — move to negotiation phase or lock if only round 0
-        debate.current_round = 1
-        return {"status": "all_declared", "next": "negotiation"}
+        # All declared — auto-transition to ACTIVE (skip negotiation for MVP)
+        logger.info(f"All {debater_count} agents declared in debate {debate.id}, auto-activating")
+        await _lock_structure_and_activate(db, debate)
+        return {"status": "all_declared", "debate_status": "active", "message": "All agents declared. Debate is now ACTIVE. Submit argument turns."}
 
     return {"status": "declaration_received", "declarations": len(unique_declarers), "needed": debater_count}
 
@@ -153,7 +154,7 @@ async def _process_negotiation(db: AsyncSession, debate: Debate, agent_id: UUID,
 
 async def _lock_structure_and_activate(db: AsyncSession, debate: Debate) -> None:
     """Lock Phase 0 structure, capture pre-debate snapshots, transition to ACTIVE."""
-    # Build phase_0_structure from participant declarations
+    # Build phase_0_structure from declaration turns (more reliable than participant fields)
     result = await db.execute(
         select(DebateParticipant).where(
             DebateParticipant.debate_id == debate.id,
@@ -162,12 +163,35 @@ async def _lock_structure_and_activate(db: AsyncSession, debate: Debate) -> None
     )
     participants = list(result.scalars().all())
 
+    # Get the latest declaration turn per agent
+    decl_result = await db.execute(
+        select(Turn).where(
+            Turn.debate_id == debate.id,
+            Turn.turn_type == "phase_0_declaration",
+            Turn.validation_status == TurnValidationStatus.VALID,
+        ).order_by(Turn.created_at.desc())
+    )
+    declarations = list(decl_result.scalars().all())
+    agent_declarations = {}
+    for d in declarations:
+        if d.agent_id not in agent_declarations:
+            agent_declarations[d.agent_id] = d
+
     structure = {}
     for p in participants:
-        structure[str(p.agent_id)] = {
-            "hard_core": p.hard_core or "",
-            "auxiliaries": p.auxiliary_hypotheses or [],
-        }
+        decl = agent_declarations.get(p.agent_id)
+        if decl:
+            # Extract structure from declaration turn content
+            structure[str(p.agent_id)] = {
+                "hard_core": decl.content[:500],  # Use turn content as the position
+                "auxiliaries": p.auxiliary_hypotheses or [],
+                "declaration_turn_id": str(decl.id),
+            }
+        else:
+            structure[str(p.agent_id)] = {
+                "hard_core": p.hard_core or "",
+                "auxiliaries": p.auxiliary_hypotheses or [],
+            }
     structure["imposed_by_arbiter"] = False
 
     debate.phase_0_structure = structure
@@ -185,11 +209,12 @@ async def _lock_structure_and_activate(db: AsyncSession, debate: Debate) -> None
 
     # Capture pre-debate position snapshots
     for p in participants:
+        decl = agent_declarations.get(p.agent_id)
         snapshot = PositionSnapshot(
             agent_id=p.agent_id,
             debate_id=debate.id,
             snapshot_type=SnapshotType.PRE_DEBATE,
-            hard_core=p.hard_core or "",
+            hard_core=decl.content[:500] if decl else (p.hard_core or ""),
             auxiliary_hypotheses=p.auxiliary_hypotheses or [],
         )
         db.add(snapshot)

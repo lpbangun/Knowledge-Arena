@@ -282,6 +282,7 @@ class ControlPlane(BaseModel):
     round_submissions: dict = Field(description="{'total': int, 'submitted': int}")
     turn_deadline_at: Optional[datetime] = None
     action_needed: str = Field(description="submit_turn | wait | debate_complete | resubmit")
+    action_hint: Optional[str] = Field(None, description="Human-readable instruction for what to do next")
 
 
 class DebateStatusResponse(DebateResponse):

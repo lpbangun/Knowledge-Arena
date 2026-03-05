@@ -263,22 +263,43 @@ async def get_debate_status(
     else:
         my_status = "pending"
 
-    # Determine action needed
+    # Determine action needed with clear instructions
+    action_hint = None
     if debate.status in (DebateStatus.COMPLETED, DebateStatus.DONE, DebateStatus.EVALUATION_FAILED):
         action = "debate_complete"
     elif my_status == "rejected":
         action = "resubmit"
     elif my_status == "pending":
         action = "submit_turn"
+        if debate.status == DebateStatus.PHASE_0:
+            # Check if this agent has already declared
+            decl_result = await db.execute(
+                select(Turn).where(
+                    Turn.debate_id == debate_id,
+                    Turn.agent_id == agent.id,
+                    Turn.turn_type == "phase_0_declaration",
+                    Turn.validation_status == TurnValidationStatus.VALID,
+                ).limit(1)
+            )
+            if decl_result.scalar_one_or_none():
+                action = "wait"
+                action_hint = "Your Phase 0 declaration is submitted. Waiting for other agents to declare."
+            else:
+                action_hint = "Submit a phase_0_declaration turn with your hard core thesis, auxiliary hypotheses, and falsification criteria."
+        elif debate.status == DebateStatus.ACTIVE:
+            action_hint = "Submit an argument turn with content, toulmin_tags (claim+data+warrant), and optional citations."
     else:
         action = "wait"
+        if debate.status == DebateStatus.PHASE_0:
+            action_hint = "Your declaration is submitted. Waiting for other agents."
+        elif debate.status == DebateStatus.ACTIVE:
+            action_hint = "Your turn is submitted. Waiting for other agents to complete this round."
 
     # Calculate turn deadline
     turn_deadline_at = None
     deadline_seconds = debate.config.get("turn_deadline_seconds")
     if deadline_seconds and debate.status in (DebateStatus.ACTIVE, DebateStatus.PHASE_0):
         from datetime import timedelta
-        # Deadline from last turn in this round, or debate creation
         last_turn_result = await db.execute(
             select(Turn.created_at).where(
                 Turn.debate_id == debate_id,
@@ -294,6 +315,7 @@ async def get_debate_status(
         round_submissions={"total": total_debaters, "submitted": len(submitted_agents)},
         turn_deadline_at=turn_deadline_at,
         action_needed=action,
+        action_hint=action_hint,
     )
 
     response = DebateStatusResponse.model_validate(debate)
@@ -396,6 +418,17 @@ async def submit_turn(
         raise HTTPException(
             status_code=422,
             detail={"error": "too_many_tags", "message": f"Maximum {settings.MAX_TOULMIN_TAGS} Toulmin tags allowed"},
+        )
+
+    # Phase 0: allow replacing previous declarations (agents may submit "test" stubs first)
+    if debate.status == DebateStatus.PHASE_0 and data.turn_type in ("phase_0_declaration", "phase_0_negotiation"):
+        from sqlalchemy import delete
+        await db.execute(
+            delete(Turn).where(
+                Turn.debate_id == debate_id,
+                Turn.agent_id == agent.id,
+                Turn.turn_type == data.turn_type,
+            )
         )
 
     # Prevent duplicate argument turns per agent per round (active debates only)
