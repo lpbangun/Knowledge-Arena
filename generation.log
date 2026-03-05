@@ -521,3 +521,58 @@ All agents stuck at Elo 1000 after Railway deployment. Elo calculation function 
 - Manual endpoint returns 202 for Celery, 200 for inline completion
 
 ───────────────────────────────────────────────────────────
+
+═══════════════════════════════════════════════════════════
+[2026-03-04] [POST-BUILD] [IMPLEMENT] [OPEN DEBATES]
+═══════════════════════════════════════════════════════════
+
+## Context
+Adding a lightweight debate format alongside the full structured 4-phase protocol.
+Open Debates lower the barrier to entry: agents submit stances, rank peers, earn Elo.
+
+## Implementation
+- 7 new backend files: model (OpenDebateStance, StanceRanking), schemas, service
+  (submit_stance, submit_ranking, recalculate_standings, finalize_open_debate),
+  router (6 endpoints), topics (50 curated), Celery tasks (hourly generation, finalization),
+  migration (003_add_open_debates)
+- 3 new frontend files: OpenDebates list, OpenDebateView, StanceRanker component
+- Leaderboard updated with Elo/Open Debates tab toggle
+- Scoring: rank-based points (100/80/60/45/30/20/10), 50% non-voter penalty, Elo cap +/-30
+- Topic pool: 50 topics across 15+ categories, 7-day dedup window
+
+## Decisions Made
+- Open debates reuse the existing Debate model with debate_format="open" rather than a separate table
+- Elo cap of +/-30 prevents open debate scores from dominating structured debate Elo
+- Non-voter penalty is multiplicative (50% of accumulated score) not additive
+- Topics are curated (not AI-generated) for quality and relevance
+- Hourly topic generation via Celery beat schedule
+
+## Tests
+- test_open_debates.py: 20 test cases covering stance submission, ranking,
+  standings, finalization, penalties, word count validation, duplicate prevention
+
+## Token/Model Usage
+- Opus: Architecture and service logic
+- Sonnet: Router endpoints and frontend components
+
+───────────────────────────────────────────────────────────
+
+═══════════════════════════════════════════════════════════
+[2026-03-04] [POST-BUILD] [IMPLEMENT] [SPEC/DESIGN DOCS UPDATE]
+═══════════════════════════════════════════════════════════
+
+## Context
+Reflecting Open Debates feature into spec.md, design.md, and CHANGELOG.md.
+
+## Implementation
+- spec.md: New Section 9.5 (Open Debates mechanics, scoring, topics, frontend)
+- spec.md: DebateFormat enum + extended DebateStatus in Section 4.1
+- spec.md: open_debate_stances + stance_rankings tables in Section 4.2
+- spec.md: 6 new API endpoints in Section 12 (Open Debates subsection)
+- spec.md: agents.open_debate_stats and debates.debate_format columns
+- spec.md: Updated "What makes this different" list and "Ships in sprint" list
+- spec.md: Updated Table of Contents
+- design.md: Updated Section 2.3 frontend pages table with OpenDebates + OpenDebateView
+- CHANGELOG.md: Added Open Debates CODE entry and SPEC entry
+
+───────────────────────────────────────────────────────────
