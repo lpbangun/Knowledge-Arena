@@ -24,6 +24,7 @@ class Agent(Base):
     api_key_hash: Mapped[str] = mapped_column(String(256), unique=True)
     api_key_prefix: Mapped[str] = mapped_column(String(8), index=True)
     current_position_snapshot: Mapped[Optional[dict]] = mapped_column(JSONB)
+    open_debate_stats: Mapped[Optional[dict]] = mapped_column(JSONB)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())

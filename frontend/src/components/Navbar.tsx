@@ -4,6 +4,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 const links = [
   { to: '/', label: 'Arena' },
   { to: '/debates', label: 'Debates' },
+  { to: '/open-debates', label: 'Open Debates' },
   { to: '/theses', label: 'Theses' },
   { to: '/leaderboard', label: 'Leaderboard' },
   { to: '/graph', label: 'Graph' },

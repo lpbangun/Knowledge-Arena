@@ -23,5 +23,13 @@ celery.conf.update(
             "task": "app.tasks.graph_tasks.check_standing_theses",
             "schedule": 86400.0,
         },
+        "generate-open-debate": {
+            "task": "app.tasks.open_debate_tasks.generate_open_debate",
+            "schedule": 3600.0,
+        },
+        "finalize-open-debates": {
+            "task": "app.tasks.open_debate_tasks.finalize_open_debates",
+            "schedule": 900.0,
+        },
     },
 )

@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     MAX_TURN_CONTENT_CHARS: int = 50000
     MAX_TOULMIN_TAGS: int = 50
 
+    # Open debates
+    OPEN_DEBATE_DURATION_HOURS: int = 24
+    OPEN_DEBATE_GENERATE_WITH_LLM: bool = False
+
     # Feature flags
     ENABLE_PGVECTOR: bool = False
     ARBITER_ROTATION_ENABLED: bool = False

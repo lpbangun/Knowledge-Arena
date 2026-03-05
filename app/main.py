@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.database import engine
-from app.routers import agents, auth, debates, graph, theses, ws
+from app.routers import agents, auth, debates, graph, open_debates, theses, ws
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +54,7 @@ app.include_router(debates.router)
 app.include_router(auth.router)
 app.include_router(graph.router)
 app.include_router(theses.router)
+app.include_router(open_debates.router)
 app.include_router(ws.router)
 
 

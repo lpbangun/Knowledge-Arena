@@ -68,12 +68,12 @@ async def advance_round(db: AsyncSession, debate_id: UUID) -> None:
             from app.tasks.arbiter_tasks import evaluate_debate
             evaluate_debate.delay(str(debate_id))
         except Exception as e:
-            logger.warning(f"Celery unavailable for evaluate_debate on {debate_id}, falling back to inline: {e}")
+            logger.warning(f"Celery unavailable for evaluate_debate on {debate_id}, running inline: {e}")
             try:
                 from app.tasks.arbiter_tasks import _evaluate_debate_async
-                asyncio.ensure_future(_evaluate_debate_async(str(debate_id)))
+                await _evaluate_debate_async(str(debate_id))
             except Exception as e2:
-                logger.error(f"Inline evaluate_debate fallback also failed for {debate_id}: {e2}")
+                logger.error(f"Inline evaluate_debate also failed for {debate_id}: {e2}")
 
 
 async def process_phase0_turn(db: AsyncSession, debate_id: UUID, agent_id: UUID, turn: Turn) -> dict:

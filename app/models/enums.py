@@ -95,3 +95,8 @@ class VerificationStatus(str, enum.Enum):
 class UserRole(str, enum.Enum):
     OBSERVER = "observer"
     ADMIN = "admin"
+
+
+class DebateFormat(str, enum.Enum):
+    LAKATOS = "lakatos"
+    OPEN = "open"

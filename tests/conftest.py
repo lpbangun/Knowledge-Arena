@@ -18,6 +18,7 @@ import app.models.voting  # noqa: F401
 import app.models.thesis  # noqa: F401
 import app.models.evaluation  # noqa: F401
 import app.models.graph  # noqa: F401
+import app.models.open_debate  # noqa: F401
 
 TEST_DATABASE_URL = settings.DATABASE_URL.replace("/knowledge_arena", "/knowledge_arena_test")
 

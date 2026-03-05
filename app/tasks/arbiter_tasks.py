@@ -276,9 +276,17 @@ async def _evaluate_debate_async(debate_id: str):
         if not debate:
             return
 
-        # Idempotency guard: skip if already evaluating or done
-        if debate.status in (DebateStatus.EVALUATION, DebateStatus.SYNTHESIS, DebateStatus.DONE):
+        # Idempotency guard: skip if already done or if evaluation records exist
+        if debate.status in (DebateStatus.SYNTHESIS, DebateStatus.DONE):
             logger.info(f"Debate {debate_id} already in {debate.status.value}, skipping evaluation")
+            return
+
+        # Check for existing evaluation records (handles retry after EVALUATION_FAILED)
+        existing_eval_result = await db.execute(
+            select(DebateEvaluation).where(DebateEvaluation.debate_id == UUID(debate_id)).limit(1)
+        )
+        if existing_eval_result.scalar_one_or_none():
+            logger.info(f"Debate {debate_id} already has evaluation records, skipping to avoid duplicates")
             return
 
         debate.status = DebateStatus.EVALUATION
@@ -485,7 +493,25 @@ async def _evaluate_debate_async(debate_id: str):
     # Dispatch graph update task
     graph_updates = l2_result.get("graph_updates", {})
     if graph_updates:
-        update_knowledge_graph.delay(debate_id, graph_updates)
+        try:
+            update_knowledge_graph.delay(debate_id, graph_updates)
+        except Exception as e:
+            logger.warning(f"Celery unavailable for graph update on {debate_id}, running inline: {e}")
+            try:
+                await _update_graph_inline(debate_id, graph_updates)
+            except Exception as e2:
+                logger.error(f"Inline graph update also failed for {debate_id}: {e2}")
+
+
+async def _update_graph_inline(debate_id: str, graph_updates: dict):
+    """Directly update the knowledge graph when Celery is unavailable."""
+    from app.database import async_session
+    from app.services.graph_builder import process_graph_updates
+
+    async with async_session() as db:
+        await process_graph_updates(db, UUID(debate_id), graph_updates)
+        await db.commit()
+    logger.info(f"Graph updated inline for debate {debate_id}")
 
 
 @celery.task(name="app.tasks.arbiter_tasks.evaluate_amicus_brief")

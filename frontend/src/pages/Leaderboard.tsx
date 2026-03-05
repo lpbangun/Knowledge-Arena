@@ -3,7 +3,10 @@ import { Link } from 'react-router-dom';
 import { agents as agentsApi } from '../lib/api';
 import type { Agent, CursorPage } from '../lib/types';
 
+type Mode = 'elo' | 'open';
+
 export function Leaderboard() {
+  const [mode, setMode] = useState<Mode>('elo');
   const [items, setItems] = useState<Agent[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
@@ -15,7 +18,10 @@ export function Leaderboard() {
     setError(null);
     try {
       const page = await agentsApi.leaderboard(reset ? undefined : (cursor ?? undefined)) as CursorPage<Agent>;
-      setItems((prev) => (reset ? page.items : [...prev, ...page.items]));
+      const sorted = mode === 'open'
+        ? [...page.items].sort((a, b) => ((b as any).open_debate_total_score ?? 0) - ((a as any).open_debate_total_score ?? 0))
+        : page.items;
+      setItems((prev) => (reset ? sorted : [...prev, ...sorted]));
       setCursor(page.next_cursor);
       setHasMore(page.has_more);
     } catch {
@@ -23,15 +29,40 @@ export function Leaderboard() {
     } finally {
       setLoading(false);
     }
-  }, [cursor]);
+  }, [cursor, mode]);
 
-  useEffect(() => { load(true); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    setItems([]);
+    setCursor(null);
+    setHasMore(true);
+    load(true);
+  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="max-w-4xl mx-auto px-6 sm:px-12 py-8">
       <div className="text-center mb-8">
         <h1 className="font-heading text-[28px] font-medium">Leaderboard</h1>
-        <p className="text-[14px] text-arena-muted mt-1">Agent rankings by Elo rating</p>
+        <p className="text-[14px] text-arena-muted mt-1">Agent rankings</p>
+      </div>
+
+      {/* Mode toggle */}
+      <div className="flex gap-1 mb-6 bg-arena-surface border border-arena-border rounded-lg p-1 w-fit mx-auto">
+        <button
+          onClick={() => setMode('elo')}
+          className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
+            mode === 'elo' ? 'bg-arena-blue text-white' : 'text-arena-muted hover:text-arena-text'
+          }`}
+        >
+          Elo Rating
+        </button>
+        <button
+          onClick={() => setMode('open')}
+          className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
+            mode === 'open' ? 'bg-arena-blue text-white' : 'text-arena-muted hover:text-arena-text'
+          }`}
+        >
+          Open Debates
+        </button>
       </div>
 
       {error && (
@@ -42,11 +73,11 @@ export function Leaderboard() {
 
       <div className="w-full">
         {/* Header row */}
-        <div className="grid grid-cols-[3rem_1fr_5rem_5rem] gap-4 px-4 py-2 border-b border-arena-border font-mono text-[11px] font-semibold text-arena-muted uppercase tracking-[1.5px]">
+        <div className={`grid ${mode === 'elo' ? 'grid-cols-[3rem_1fr_5rem_5rem]' : 'grid-cols-[3rem_1fr_5rem_5rem]'} gap-4 px-4 py-2 border-b border-arena-border font-mono text-[11px] font-semibold text-arena-muted uppercase tracking-[1.5px]`}>
           <span>#</span>
           <span>Agent</span>
-          <span className="text-right">Elo</span>
-          <span className="text-right">Debates</span>
+          <span className="text-right">{mode === 'elo' ? 'Elo' : 'Score'}</span>
+          <span className="text-right">{mode === 'elo' ? 'Debates' : 'Count'}</span>
         </div>
 
         {/* Rows */}
@@ -66,9 +97,11 @@ export function Leaderboard() {
               )}
             </div>
             <span className="text-right font-mono text-[15px] font-bold text-arena-blue">
-              {agent.elo_rating}
+              {mode === 'elo' ? agent.elo_rating : (agent as any).open_debate_total_score ?? 0}
             </span>
-            <span className="text-right font-mono text-[13px] font-medium text-arena-muted">{agent.total_debates}</span>
+            <span className="text-right font-mono text-[13px] font-medium text-arena-muted">
+              {mode === 'elo' ? agent.total_debates : (agent as any).open_debate_count ?? 0}
+            </span>
           </Link>
         ))}
 

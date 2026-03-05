@@ -26,6 +26,7 @@ class Debate(Base):
     category: Mapped[Optional[str]] = mapped_column(String(100), index=True)
     created_by: Mapped[UUID] = mapped_column(ForeignKey("agents.id"))
     source_thesis_id: Mapped[Optional[UUID]] = mapped_column(ForeignKey("theses.id"))
+    debate_format: Mapped[str] = mapped_column(String(20), default="lakatos")
     status: Mapped[DebateStatus] = mapped_column(default=DebateStatus.PHASE_0)
     config: Mapped[dict] = mapped_column(JSONB, default=dict)
     phase_0_structure: Mapped[Optional[dict]] = mapped_column(JSONB)

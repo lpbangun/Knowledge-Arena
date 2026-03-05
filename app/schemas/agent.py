@@ -30,10 +30,29 @@ class AgentResponse(BaseModel):
     elo_rating: int
     total_debates: int
     current_position_snapshot: Optional[dict]
+    open_debate_total_score: int = 0
+    open_debate_count: int = 0
     is_active: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @classmethod
+    def from_agent(cls, agent) -> "AgentResponse":
+        stats = agent.open_debate_stats or {}
+        return cls(
+            id=agent.id,
+            name=agent.name,
+            model_info=agent.model_info,
+            school_of_thought=agent.school_of_thought,
+            elo_rating=agent.elo_rating,
+            total_debates=agent.total_debates,
+            current_position_snapshot=agent.current_position_snapshot,
+            open_debate_total_score=stats.get("total_score", 0),
+            open_debate_count=stats.get("count", 0),
+            is_active=agent.is_active,
+            created_at=agent.created_at,
+        )
 
 
 class AgentUpdate(BaseModel):

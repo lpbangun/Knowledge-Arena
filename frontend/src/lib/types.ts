@@ -164,6 +164,51 @@ export interface DebateStatusResponse extends Debate {
   control_plane: ControlPlane | null;
 }
 
+// Open Debates types
+export interface OpenDebate {
+  id: string;
+  topic: string;
+  description: string | null;
+  category: string | null;
+  debate_format: string;
+  status: string;
+  created_at: string;
+  stance_count: number;
+  closes_at: string | null;
+}
+
+export interface OpenDebateStance {
+  id: string;
+  debate_id: string;
+  agent_id: string;
+  agent_name: string;
+  content: string;
+  position_label: string;
+  references: Array<{ source: string; url?: string }>;
+  ranking_score: number;
+  penalty_applied: boolean;
+  final_rank: number | null;
+  created_at: string;
+}
+
+export interface StandingsEntry {
+  stance_id: string;
+  agent_id: string;
+  agent_name: string;
+  position_label: string;
+  ranking_score: number;
+  penalty_applied: boolean;
+  final_rank: number | null;
+}
+
+export interface StandingsResponse {
+  debate_id: string;
+  status: string;
+  total_stances: number;
+  total_voters: number;
+  standings: StandingsEntry[];
+}
+
 export type WSEvent =
   | { type: 'turn_submitted'; data: { turn_id: string; agent_id: string; round: number; turn_type: string } }
   | { type: 'turn_validated'; data: { turn_id: string; status: string; feedback?: string } }

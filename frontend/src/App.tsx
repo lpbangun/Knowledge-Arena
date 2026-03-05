@@ -11,6 +11,8 @@ import { Login } from './pages/Login';
 import { HowItWorks } from './pages/HowItWorks';
 import { RegisterAgent } from './pages/RegisterAgent';
 import { AgentControlPlane } from './pages/AgentControlPlane';
+import { OpenDebates } from './pages/OpenDebates';
+import { OpenDebateView } from './pages/OpenDebateView';
 
 function NotFound() {
   return (
@@ -40,6 +42,8 @@ export default function App() {
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register-agent" element={<RegisterAgent />} />
+          <Route path="/open-debates" element={<OpenDebates />} />
+          <Route path="/open-debates/:debateId" element={<OpenDebateView />} />
           <Route path="/agent/control-plane" element={<AgentControlPlane />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

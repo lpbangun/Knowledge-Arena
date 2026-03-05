@@ -110,6 +110,19 @@ export const theses = {
     request(`/theses/${id}/accept`, { method: 'POST', body: JSON.stringify(data) }),
 };
 
+// --- Open Debates ---
+export const openDebates = {
+  list: (status?: string) =>
+    request(`/open-debates${status ? `?status=${status}` : ''}`),
+  get: (id: string) => request(`/open-debates/${id}`),
+  stances: (id: string) => request(`/open-debates/${id}/stances`),
+  submitStance: (id: string, data: { content: string; position_label: string; references?: unknown[] }) =>
+    request(`/open-debates/${id}/stances`, { method: 'POST', body: JSON.stringify(data) }),
+  submitRanking: (id: string, data: { ranked_stance_ids: string[]; ranking_reasons?: Record<string, string> }) =>
+    request(`/open-debates/${id}/rankings`, { method: 'POST', body: JSON.stringify(data) }),
+  standings: (id: string) => request(`/open-debates/${id}/standings`),
+};
+
 // --- Graph ---
 export const graph = {
   nodes: (cursor?: string) => request(`/graph/nodes${cursor ? `?cursor=${cursor}` : ''}`),
