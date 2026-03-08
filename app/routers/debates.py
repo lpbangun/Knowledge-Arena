@@ -22,6 +22,8 @@ from app.models.enums import (
 )
 from app.schemas.common import CursorPage
 from app.schemas.debate import (
+    ActRequest,
+    ActResponse,
     AmicusBriefCreate,
     CitationChallengeCreate,
     CommentCreate,
@@ -30,9 +32,11 @@ from app.schemas.debate import (
     DebateJoin,
     DebateResponse,
     DebateStatusResponse,
+    ParticipantInfo,
     ParticipantResponse,
     TurnResponse,
     TurnSubmit,
+    TurnSubmitResponse,
     VoteCreate,
 )
 from app.tasks.arbiter_tasks import validate_turn, validate_phase0_declaration, evaluate_amicus_brief, evaluate_debate
@@ -98,13 +102,19 @@ async def create_debate(
     agent: Agent = Depends(get_current_agent),
     db: AsyncSession = Depends(get_db),
 ):
+    is_quick = data.debate_format == "quick"
     debate = Debate(
         topic=data.topic,
         description=data.description,
         category=data.category,
         created_by=agent.id,
+        debate_format=data.debate_format,
         config=data.config,
         max_rounds=data.max_rounds,
+        # Quick format: skip Phase 0, start active at round 1
+        status=DebateStatus.ACTIVE if is_quick else DebateStatus.PHASE_0,
+        current_round=1 if is_quick else 0,
+        phase_0_structure={"auto_generated": True, "agents": {str(agent.id): {"school_of_thought": agent.school_of_thought or "unspecified"}}} if is_quick else None,
     )
     db.add(debate)
     await db.flush()
@@ -212,114 +222,41 @@ async def get_debate_structure(debate_id: UUID, db: AsyncSession = Depends(get_d
 @router.get("/{debate_id}/status", response_model=DebateStatusResponse)
 async def get_debate_status(
     debate_id: UUID,
+    include_turns: bool = Query(default=True, description="Include recent turns from the previous/current round"),
     agent: Agent = Depends(get_current_agent),
     db: AsyncSession = Depends(get_db),
 ):
-    """Agent-aware debate status with control plane signals."""
+    """Agent-aware debate status with control plane signals, recent turns, and participants."""
     result = await db.execute(select(Debate).where(Debate.id == debate_id))
     debate = result.scalar_one_or_none()
     if not debate:
         raise HTTPException(status_code=404, detail={"error": "debate_not_found", "message": f"Debate {debate_id} does not exist"})
 
-    # Build control plane for this agent
-    debater_count_result = await db.execute(
-        select(sa_func.count(DebateParticipant.id)).where(
-            DebateParticipant.debate_id == debate_id,
-            DebateParticipant.role == ParticipantRole.DEBATER,
-        )
-    )
-    total_debaters = debater_count_result.scalar() or 0
+    from app.services.debate_actions import build_control_plane, get_opponent_turns, get_participants_info
 
-    # Count submitted turns this round (unique agents)
-    # When debate is ACTIVE, only count argument/resubmission turns (not Phase 0 turns)
-    turn_type_filter = Turn.turn_type.in_(("argument", "resubmission")) if debate.status == DebateStatus.ACTIVE else True
-    submitted_result = await db.execute(
-        select(Turn.agent_id).where(
-            Turn.debate_id == debate_id,
-            Turn.round_number == debate.current_round,
-            turn_type_filter,
-        ).distinct()
-    )
-    submitted_agents = {row[0] for row in submitted_result.all()}
-
-    # Check this agent's submission status
-    agent_turn_result = await db.execute(
-        select(Turn).where(
-            Turn.debate_id == debate_id,
-            Turn.round_number == debate.current_round,
-            Turn.agent_id == agent.id,
-            turn_type_filter,
-        ).order_by(Turn.created_at.desc()).limit(1)
-    )
-    agent_turn = agent_turn_result.scalar_one_or_none()
-
-    if agent_turn:
-        if agent_turn.validation_status == TurnValidationStatus.VALID:
-            my_status = "validated"
-        elif agent_turn.validation_status == TurnValidationStatus.REJECTED:
-            my_status = "rejected"
-        else:
-            my_status = "submitted"
-    else:
-        my_status = "pending"
-
-    # Determine action needed with clear instructions
-    action_hint = None
-    if debate.status in (DebateStatus.COMPLETED, DebateStatus.DONE, DebateStatus.EVALUATION_FAILED):
-        action = "debate_complete"
-    elif my_status == "rejected":
-        action = "resubmit"
-    elif my_status == "pending":
-        action = "submit_turn"
-        if debate.status == DebateStatus.PHASE_0:
-            # Check if this agent has already declared
-            decl_result = await db.execute(
-                select(Turn).where(
-                    Turn.debate_id == debate_id,
-                    Turn.agent_id == agent.id,
-                    Turn.turn_type == "phase_0_declaration",
-                    Turn.validation_status == TurnValidationStatus.VALID,
-                ).limit(1)
-            )
-            if decl_result.scalar_one_or_none():
-                action = "wait"
-                action_hint = "Your Phase 0 declaration is submitted. Waiting for other agents to declare."
-            else:
-                action_hint = "Submit a phase_0_declaration turn with your hard core thesis, auxiliary hypotheses, and falsification criteria."
-        elif debate.status == DebateStatus.ACTIVE:
-            action_hint = "Submit an argument turn with content, toulmin_tags (claim+data+warrant), and optional citations."
-    else:
-        action = "wait"
-        if debate.status == DebateStatus.PHASE_0:
-            action_hint = "Your declaration is submitted. Waiting for other agents."
-        elif debate.status == DebateStatus.ACTIVE:
-            action_hint = "Your turn is submitted. Waiting for other agents to complete this round."
-
-    # Calculate turn deadline
-    turn_deadline_at = None
-    deadline_seconds = debate.config.get("turn_deadline_seconds")
-    if deadline_seconds and debate.status in (DebateStatus.ACTIVE, DebateStatus.PHASE_0):
-        from datetime import timedelta
-        last_turn_result = await db.execute(
-            select(Turn.created_at).where(
-                Turn.debate_id == debate_id,
-                Turn.round_number == debate.current_round,
-            ).order_by(Turn.created_at.desc()).limit(1)
-        )
-        last_turn_row = last_turn_result.one_or_none()
-        if last_turn_row:
-            turn_deadline_at = last_turn_row[0] + timedelta(seconds=deadline_seconds)
-
-    control_plane = ControlPlane(
-        my_submission_status=my_status,
-        round_submissions={"total": total_debaters, "submitted": len(submitted_agents)},
-        turn_deadline_at=turn_deadline_at,
-        action_needed=action,
-        action_hint=action_hint,
-    )
-
+    control_plane = await build_control_plane(db, debate, agent)
     response = DebateStatusResponse.model_validate(debate)
     response.control_plane = control_plane
+
+    if include_turns:
+        # Include turns from previous round (or current round if some are submitted)
+        round_to_fetch = max(debate.current_round - 1, 0) if debate.status == DebateStatus.ACTIVE else debate.current_round
+        if round_to_fetch > 0:
+            turns_result = await db.execute(
+                select(Turn).where(
+                    Turn.debate_id == debate_id,
+                    Turn.round_number == round_to_fetch,
+                    Turn.validation_status == TurnValidationStatus.VALID,
+                ).order_by(Turn.created_at.asc())
+            )
+            response.recent_turns = [TurnResponse.model_validate(t) for t in turns_result.scalars().all()]
+        else:
+            response.recent_turns = []
+
+        # Include participant info
+        participants = await get_participants_info(db, debate_id)
+        response.participants = [ParticipantInfo(**p) for p in participants]
+
     return response
 
 
@@ -335,7 +272,11 @@ async def join_debate(
     if not debate:
         raise HTTPException(status_code=404, detail={"error": "debate_not_found", "message": f"Debate {debate_id} does not exist"})
 
-    if debate.status not in (DebateStatus.PHASE_0,):
+    # Quick-format debates allow joining while active
+    joinable_statuses = [DebateStatus.PHASE_0]
+    if debate.debate_format == "quick":
+        joinable_statuses.append(DebateStatus.ACTIVE)
+    if debate.status not in joinable_statuses:
         raise HTTPException(status_code=400, detail={"error": "debate_not_joinable", "message": "Debate is no longer accepting participants"})
 
     # Check if already joined
@@ -380,7 +321,7 @@ async def join_debate(
     return participant
 
 
-@router.post("/{debate_id}/turns", response_model=TurnResponse, status_code=202)
+@router.post("/{debate_id}/turns", response_model=TurnSubmitResponse, status_code=200)
 async def submit_turn(
     debate_id: UUID,
     data: TurnSubmit,
@@ -451,13 +392,18 @@ async def submit_turn(
                 detail={"error": "duplicate_turn", "message": f"Agent already submitted a turn for round {debate.current_round}"},
             )
 
+    # Auto-generate Toulmin tags if none provided (Phase 2)
+    if not data.toulmin_tags and data.turn_type in ("argument", "resubmission"):
+        from app.services.toulmin_autotag import auto_generate_toulmin_tags
+        data.toulmin_tags = auto_generate_toulmin_tags(data.content)
+
     # Serialize tags and citations — handle both Pydantic models and raw dicts
     serialized_tags = []
     for t in data.toulmin_tags:
-        serialized_tags.append(t.model_dump() if hasattr(t, "model_dump") else t)
+        serialized_tags.append(t.model_dump() if hasattr(t, "model_dump") else (t if isinstance(t, dict) else t))
     serialized_refs = []
     for c in data.citation_references:
-        serialized_refs.append(c.model_dump() if hasattr(c, "model_dump") else c)
+        serialized_refs.append(c.model_dump() if hasattr(c, "model_dump") else (c if isinstance(c, dict) else c))
 
     turn = Turn(
         debate_id=debate_id,
@@ -476,52 +422,73 @@ async def submit_turn(
     import logging
     _logger = logging.getLogger(__name__)
 
+    # Track round advancement for enriched response
+    round_advanced = False
+    new_round = debate.current_round
+    debate_completed = False
+    opponent_turns_list = []
+
     if settings.AUTO_VALIDATE_TURNS:
         # Auto-validate: skip arbiter, mark turn as VALID immediately
         turn.validation_status = TurnValidationStatus.VALID
-        # Commit turn immediately so other concurrent requests can see it
         await db.commit()
         _logger.info(f"Auto-validated turn {turn.id}")
 
-        # Re-fetch debate after commit (session state may be stale)
+        # Re-fetch debate after commit
         result2 = await db.execute(select(Debate).where(Debate.id == debate_id))
         debate = result2.scalar_one()
 
-        # Run protocol logic inline for Phase 0 turns
         if debate.status == DebateStatus.PHASE_0 and data.turn_type in ("phase_0_declaration", "phase_0_negotiation"):
             from app.services.protocol import process_phase0_turn
             p0_result = await process_phase0_turn(db, debate_id, agent.id, turn)
             _logger.info(f"Phase 0 result: {p0_result}")
             await db.commit()
+            # Re-fetch to see if debate became active
+            result3 = await db.execute(select(Debate).where(Debate.id == debate_id))
+            debate = result3.scalar_one()
+            if debate.status == DebateStatus.ACTIVE:
+                round_advanced = True
+                new_round = debate.current_round
         elif debate.status == DebateStatus.ACTIVE:
-            import asyncio as _asyncio
-            from app.services.protocol import check_round_complete, advance_round
-            # Retry check a few times with short delays to handle concurrent submissions
-            for _check_attempt in range(3):
-                if await check_round_complete(db, debate_id):
-                    await advance_round(db, debate_id)
-                    await db.commit()
-                    _logger.info(f"Round advanced for debate {debate_id}")
+            from app.services.protocol import check_and_advance_round
+            advance_result = await check_and_advance_round(db, debate_id)
+            await db.commit()
 
-                    # Check if debate reached COMPLETED after advance_round
-                    result3 = await db.execute(select(Debate).where(Debate.id == debate_id))
-                    debate_after = result3.scalar_one()
-                    if debate_after.status == DebateStatus.COMPLETED:
-                        _logger.info(f"Debate {debate_id} completed, triggering inline evaluation")
-                        try:
-                            from app.tasks.arbiter_tasks import _evaluate_debate_async
-                            await _evaluate_debate_async(str(debate_id))
-                        except Exception as eval_err:
-                            _logger.error(f"Inline evaluation failed for {debate_id}: {eval_err}")
-                    break
-                if _check_attempt < 2:
-                    await _asyncio.sleep(1)
-                    # Expire cached objects to see freshly committed data from other requests
-                    db.expire_all()
+            if advance_result["advanced"]:
+                round_advanced = True
+                new_round = advance_result["new_round"]
+                debate_completed = advance_result["completed"]
+                _logger.info(f"Round advanced for debate {debate_id} -> round {new_round}")
+
+                if debate_completed:
+                    _logger.info(f"Debate {debate_id} completed, triggering inline evaluation")
+                    try:
+                        from app.tasks.arbiter_tasks import _evaluate_debate_async
+                        await _evaluate_debate_async(str(debate_id))
+                    except Exception as eval_err:
+                        _logger.error(f"Inline evaluation failed for {debate_id}: {eval_err}")
+
+                # Get opponent turns from the completed round
+                from app.services.debate_actions import get_opponent_turns
+                completed_round = new_round - 1 if round_advanced else debate.current_round
+                opponent_turns_list = await get_opponent_turns(db, debate_id, completed_round, agent.id)
+
+        # Send webhook notifications to other agents
+        try:
+            from app.services.webhooks import notify_debate_agents
+            if round_advanced:
+                await notify_debate_agents(db, debate_id, "round_advanced", {
+                    "new_round": new_round,
+                    "completed": debate_completed,
+                }, exclude_agent_id=agent.id)
             else:
-                _logger.info(f"Round not yet complete for debate {debate_id}")
+                await notify_debate_agents(db, debate_id, "turn_submitted", {
+                    "round": debate.current_round,
+                }, exclude_agent_id=agent.id)
+        except Exception as wh_err:
+            _logger.warning(f"Webhook notification failed (non-fatal): {wh_err}")
     else:
-        # Try Celery dispatch; fall back to inline async validation
+        # Celery path — return 202-style response (no round info yet)
         celery_ok = False
         try:
             if debate.status == DebateStatus.PHASE_0 and data.turn_type in ("phase_0_declaration", "phase_0_negotiation"):
@@ -533,7 +500,6 @@ async def submit_turn(
             _logger.warning(f"Celery unavailable, using inline validation: {e}")
 
         if not celery_ok:
-            # Inline validation fallback
             try:
                 from app.tasks.arbiter_tasks import (
                     _validate_turn_async, _validate_phase0_async,
@@ -554,7 +520,99 @@ async def submit_turn(
     except Exception as e:
         _logger.warning(f"WebSocket publish failed (non-fatal): {e}")
 
-    return turn
+    # Re-fetch debate for final status
+    result_final = await db.execute(select(Debate).where(Debate.id == debate_id))
+    debate_final = result_final.scalar_one()
+
+    # Build control plane for response
+    from app.services.debate_actions import build_control_plane
+    control_plane = await build_control_plane(db, debate_final, agent)
+
+    # Build enriched response
+    turn_resp = TurnSubmitResponse.model_validate(turn)
+    turn_resp.round_advanced = round_advanced
+    turn_resp.new_round = new_round if round_advanced else None
+    turn_resp.debate_status = debate_final.status.value
+    turn_resp.debate_completed = debate_completed
+    turn_resp.opponent_turns = [TurnResponse.model_validate(t) for t in opponent_turns_list]
+    turn_resp.control_plane = control_plane
+
+    return turn_resp
+
+
+@router.post("/{debate_id}/act", response_model=ActResponse)
+async def act(
+    debate_id: UUID,
+    data: ActRequest,
+    agent: Agent = Depends(get_current_agent),
+    db: AsyncSession = Depends(get_db),
+):
+    """One-call-per-round endpoint. Combines status check + turn submission.
+
+    - If `content` is null: returns current state, opponent turns, and control plane (read-only).
+    - If `content` is provided: submits a turn and returns the enriched result.
+    """
+    from app.services.debate_actions import build_control_plane, get_opponent_turns, get_participants_info
+
+    result = await db.execute(select(Debate).where(Debate.id == debate_id))
+    debate = result.scalar_one_or_none()
+    if not debate:
+        raise HTTPException(status_code=404, detail={"error": "debate_not_found", "message": f"Debate {debate_id} does not exist"})
+
+    # Get participants
+    participants = await get_participants_info(db, debate_id)
+
+    # Get opponent turns from previous round (or current if some submitted)
+    prev_round = max(debate.current_round - 1, 0) if debate.status == DebateStatus.ACTIVE else debate.current_round
+    opponent_turns_list = []
+    if prev_round > 0:
+        opponent_turns_list = await get_opponent_turns(db, debate_id, prev_round, agent.id)
+
+    my_turn = None
+    round_advanced = False
+    debate_completed = False
+
+    if data.content is not None:
+        # Submit a turn — delegate to TurnSubmit and submit_turn logic
+        turn_data = TurnSubmit(
+            content=data.content,
+            turn_type=data.turn_type,
+            toulmin_tags=data.toulmin_tags,
+            falsification_target=data.falsification_target,
+            citation_references=data.citation_references,
+        )
+
+        # Call submit_turn and extract the enriched response
+        turn_response = await submit_turn(debate_id, turn_data, agent, db)
+        my_turn = TurnResponse.model_validate(turn_response)
+        round_advanced = turn_response.round_advanced
+        debate_completed = turn_response.debate_completed
+
+        # Re-fetch debate after submission
+        result2 = await db.execute(select(Debate).where(Debate.id == debate_id))
+        debate = result2.scalar_one()
+
+        # If round advanced, get updated opponent turns
+        if round_advanced:
+            completed_round = debate.current_round - 1
+            opponent_turns_list = await get_opponent_turns(db, debate_id, completed_round, agent.id)
+
+    control_plane = await build_control_plane(db, debate, agent)
+
+    return ActResponse(
+        debate_id=debate.id,
+        debate_status=debate.status.value,
+        debate_format=debate.debate_format,
+        current_round=debate.current_round,
+        max_rounds=debate.max_rounds,
+        topic=debate.topic,
+        control_plane=control_plane,
+        opponent_turns=[TurnResponse.model_validate(t) for t in opponent_turns_list],
+        participants=[ParticipantInfo(**p) for p in participants],
+        my_turn=my_turn,
+        round_advanced=round_advanced,
+        debate_completed=debate_completed,
+    )
 
 
 @router.get("/{debate_id}/turns", response_model=CursorPage[TurnResponse])

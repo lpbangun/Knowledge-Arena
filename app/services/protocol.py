@@ -76,6 +76,47 @@ async def advance_round(db: AsyncSession, debate_id: UUID) -> None:
                 logger.error(f"Inline evaluate_debate also failed for {debate_id}: {e2}")
 
 
+async def check_and_advance_round(db: AsyncSession, debate_id: UUID) -> dict:
+    """Check round completion and advance if ready. Returns structured result.
+
+    Returns:
+        {"advanced": bool, "new_round": int, "completed": bool}
+    """
+    result = await db.execute(select(Debate).where(Debate.id == debate_id))
+    debate = result.scalar_one_or_none()
+    if not debate:
+        return {"advanced": False, "new_round": 0, "completed": False}
+
+    debater_count = await get_debater_count(db, debate_id)
+    submissions = await get_round_submissions(db, debate_id, debate.current_round)
+    unique_agents = {t.agent_id for t in submissions}
+
+    if len(unique_agents) < debater_count:
+        return {"advanced": False, "new_round": debate.current_round, "completed": False}
+
+    # Round is complete — advance
+    old_round = debate.current_round
+    debate.current_round += 1
+
+    completed = False
+    if debate.current_round > debate.max_rounds:
+        debate.status = DebateStatus.COMPLETED
+        debate.completed_at = datetime.utcnow()
+        completed = True
+        try:
+            from app.tasks.arbiter_tasks import evaluate_debate
+            evaluate_debate.delay(str(debate_id))
+        except Exception as e:
+            logger.warning(f"Celery unavailable for evaluate_debate on {debate_id}, running inline: {e}")
+            try:
+                from app.tasks.arbiter_tasks import _evaluate_debate_async
+                await _evaluate_debate_async(str(debate_id))
+            except Exception as e2:
+                logger.error(f"Inline evaluate_debate also failed for {debate_id}: {e2}")
+
+    return {"advanced": True, "new_round": debate.current_round, "completed": completed}
+
+
 async def process_phase0_turn(db: AsyncSession, debate_id: UUID, agent_id: UUID, turn: Turn) -> dict:
     """Process a Phase 0 turn. Returns status info."""
     result = await db.execute(select(Debate).where(Debate.id == debate_id))
@@ -118,11 +159,12 @@ async def _process_declaration(db: AsyncSession, debate: Debate, agent_id: UUID,
 
     # Majority activation: if 2+ agents declared and we have majority, activate
     if len(unique_declarers) >= 2 and len(unique_declarers) >= (debater_count + 1) // 2:
-        # Check if the first declaration was submitted >10 minutes ago (give stragglers time)
+        # Check if the first declaration was submitted long enough ago (give stragglers time)
         from datetime import datetime, timezone, timedelta
+        from app.config import settings
         earliest_decl = min(declarations, key=lambda t: t.created_at)
         age = datetime.now(timezone.utc) - earliest_decl.created_at.replace(tzinfo=timezone.utc)
-        if age > timedelta(minutes=10):
+        if age > timedelta(seconds=settings.PHASE_0_TIMEOUT_SECONDS):
             logger.info(f"Majority ({len(unique_declarers)}/{debater_count}) declared in debate {debate.id} after {age}, auto-activating")
             # Demote non-declaring debaters to audience
             all_participants = await db.execute(

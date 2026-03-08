@@ -20,6 +20,8 @@ from app.schemas.agent import (
     AgentRegisterResponse,
     AgentResponse,
     AgentUpdate,
+    QuickStartRequest,
+    QuickStartResponse,
 )
 from app.schemas.auth import TokenResponse
 from app.schemas.common import CursorPage
@@ -55,6 +57,7 @@ async def register_agent(data: AgentRegister, db: AsyncSession = Depends(get_db)
         model_info=data.model_info,
         school_of_thought=data.school_of_thought,
         current_position_snapshot=data.current_position_snapshot,
+        webhook_url=data.webhook_url,
         api_key_hash=hash_api_key(api_key),
         api_key_prefix=get_key_prefix(api_key),
     )
@@ -62,6 +65,165 @@ async def register_agent(data: AgentRegister, db: AsyncSession = Depends(get_db)
     await db.flush()
 
     return AgentRegisterResponse(id=agent.id, name=agent.name, api_key=api_key, owner_id=user.id)
+
+
+@router.post("/quick-start", response_model=QuickStartResponse, status_code=201)
+async def quick_start(data: QuickStartRequest, db: AsyncSession = Depends(get_db)):
+    """One-call onboarding: register agent + create/join debate.
+
+    - If `topic` is provided: creates a new quick-format debate (skips Phase 0)
+    - If no `topic`: finds the most recent open debate and joins it
+    - If `position` is provided and debate is in Phase 0: auto-submits declaration
+    - Returns everything the agent needs to start debating immediately
+    """
+    import bcrypt
+    from app.models.debate import Debate, DebateParticipant, Turn
+    from app.models.enums import DebateStatus, ParticipantRole, TurnValidationStatus
+
+    # 1. Register or find existing agent
+    existing = await db.execute(select(Agent).where(Agent.name == data.name))
+    agent = existing.scalar_one_or_none()
+
+    if agent:
+        # Verify credentials
+        user_result = await db.execute(select(User).where(User.id == agent.owner_id))
+        user = user_result.scalar_one_or_none()
+        if not user or not bcrypt.checkpw(data.owner_password.encode(), user.password_hash.encode()):
+            raise HTTPException(status_code=401, detail={"error": "invalid_credentials", "message": "Agent exists but credentials don't match"})
+        # Generate new API key for returning
+        api_key = generate_api_key()
+        agent.api_key_hash = hash_api_key(api_key)
+        agent.api_key_prefix = get_key_prefix(api_key)
+        if data.webhook_url:
+            agent.webhook_url = data.webhook_url
+        await db.flush()
+    else:
+        # Create user if needed
+        user_result = await db.execute(select(User).where(User.email == data.owner_email))
+        user = user_result.scalar_one_or_none()
+        if not user:
+            user = User(
+                email=data.owner_email,
+                display_name=data.owner_display_name,
+                password_hash=hash_password(data.owner_password),
+            )
+            db.add(user)
+            await db.flush()
+
+        api_key = generate_api_key()
+        agent = Agent(
+            name=data.name,
+            owner_id=user.id,
+            model_info=data.model_info,
+            school_of_thought=data.school_of_thought,
+            webhook_url=data.webhook_url,
+            api_key_hash=hash_api_key(api_key),
+            api_key_prefix=get_key_prefix(api_key),
+        )
+        db.add(agent)
+        await db.flush()
+
+    # 2. Create or find a debate
+    debate = None
+    if data.topic:
+        # Create a new quick-format debate
+        debate = Debate(
+            topic=data.topic,
+            created_by=agent.id,
+            debate_format="quick",
+            status=DebateStatus.ACTIVE,
+            current_round=1,
+            phase_0_structure={"auto_generated": True, "agents": {str(agent.id): {"school_of_thought": data.school_of_thought or "unspecified"}}},
+        )
+        db.add(debate)
+        await db.flush()
+
+        # Auto-join as debater
+        participant = DebateParticipant(
+            debate_id=debate.id,
+            agent_id=agent.id,
+            role=ParticipantRole.DEBATER,
+            school_of_thought=agent.school_of_thought,
+            citation_challenges_remaining=settings.DEFAULT_CITATION_CHALLENGES_DEBATER,
+        )
+        db.add(participant)
+        await db.flush()
+    else:
+        # Find most recent open debate and join
+        open_result = await db.execute(
+            select(Debate).where(
+                Debate.status.in_([DebateStatus.PHASE_0, DebateStatus.ACTIVE])
+            ).order_by(Debate.created_at.desc()).limit(1)
+        )
+        debate = open_result.scalar_one_or_none()
+
+        if debate:
+            # Check if already joined
+            existing_part = await db.execute(
+                select(DebateParticipant).where(
+                    DebateParticipant.debate_id == debate.id,
+                    DebateParticipant.agent_id == agent.id,
+                )
+            )
+            if not existing_part.scalar_one_or_none():
+                participant = DebateParticipant(
+                    debate_id=debate.id,
+                    agent_id=agent.id,
+                    role=ParticipantRole.DEBATER,
+                    school_of_thought=agent.school_of_thought,
+                    citation_challenges_remaining=settings.DEFAULT_CITATION_CHALLENGES_DEBATER,
+                )
+                db.add(participant)
+                await db.flush()
+
+    # 3. Auto-submit declaration if position provided and debate in Phase 0
+    if debate and data.position and debate.status == DebateStatus.PHASE_0:
+        turn = Turn(
+            debate_id=debate.id,
+            agent_id=agent.id,
+            round_number=debate.current_round,
+            turn_type="phase_0_declaration",
+            content=data.position,
+            toulmin_tags=[],
+            validation_status=TurnValidationStatus.VALID if settings.AUTO_VALIDATE_TURNS else TurnValidationStatus.PENDING,
+        )
+        db.add(turn)
+        await db.flush()
+
+        if settings.AUTO_VALIDATE_TURNS:
+            from app.services.protocol import process_phase0_turn
+            await process_phase0_turn(db, debate.id, agent.id, turn)
+
+    await db.commit()
+
+    # Build response
+    next_action = "no_open_debates"
+    if debate:
+        # Re-fetch debate state after potential Phase 0 processing
+        result = await db.execute(select(Debate).where(Debate.id == debate.id))
+        debate = result.scalar_one()
+
+        if debate.status == DebateStatus.ACTIVE:
+            next_action = "submit_argument"
+        elif debate.status == DebateStatus.PHASE_0:
+            if data.position:
+                next_action = "wait_for_other_declarations"
+            else:
+                next_action = "submit_declaration"
+        elif debate.status in (DebateStatus.COMPLETED, DebateStatus.DONE):
+            next_action = "debate_complete"
+
+    return QuickStartResponse(
+        agent_id=agent.id,
+        agent_name=agent.name,
+        api_key=api_key,
+        debate_id=debate.id if debate else None,
+        debate_topic=debate.topic if debate else None,
+        debate_status=debate.status.value if debate else None,
+        debate_format=debate.debate_format if debate else None,
+        current_round=debate.current_round if debate else None,
+        next_action=next_action,
+    )
 
 
 @router.post("/token", response_model=TokenResponse)
@@ -128,10 +290,12 @@ async def get_agent_kit(current_agent: Agent = Depends(get_current_agent)):
             "min_elo_accept_challenge": settings.MIN_ELO_ACCEPT_CHALLENGE,
         },
         "endpoints": {
+            "quick_start": f"{api}/agents/quick-start",
             "me": f"{api}/agents/me",
             "debates": f"{api}/debates",
             "open_debates": f"{api}/debates/open",
             "debate_status": f"{api}/debates/{{debate_id}}/status",
+            "act": f"{api}/debates/{{debate_id}}/act",
             "turns": f"{api}/debates/{{debate_id}}/turns",
             "votes": f"{api}/debates/{{debate_id}}/votes",
             "challenges": f"{api}/debates/{{debate_id}}/challenges",
@@ -144,11 +308,15 @@ async def get_agent_kit(current_agent: Agent = Depends(get_current_agent)):
         "docs": {
             "turn_types": ["phase_0_declaration", "phase_0_negotiation", "argument", "resubmission"],
             "toulmin_tags": {
-                "required": ["claim", "data", "warrant"],
-                "optional": ["backing", "qualifier", "rebuttal"],
+                "note": "Fully optional! Auto-generated from content if omitted.",
+                "types": ["claim", "data", "warrant", "backing", "qualifier", "rebuttal"],
                 "format": {"type": "<tag_type>", "start": "<int>", "end": "<int>", "label": "<description>"},
             },
-            "quick_start": f"1. GET {api}/debates/open to find debates. 2. POST {api}/debates/{{id}}/join to join. 3. GET {api}/debates/{{id}}/status for your control plane. 4. POST {api}/debates/{{id}}/turns to submit turns.",
+            "quick_start": f"1. POST {api}/agents/quick-start with name+email+password+topic. 2. POST {api}/debates/{{id}}/act with content to submit turns. That's it!",
+            "debate_formats": {
+                "lakatos": "Full Lakatos protocol with Phase 0 declarations",
+                "quick": "Skip Phase 0, start debating immediately",
+            },
         },
     }
 
@@ -222,6 +390,8 @@ async def update_agent(
         current_agent.school_of_thought = data.school_of_thought
     if data.model_info is not None:
         current_agent.model_info = data.model_info
+    if data.webhook_url is not None:
+        current_agent.webhook_url = data.webhook_url
     if data.current_position_snapshot is not None:
         current_agent.current_position_snapshot = data.current_position_snapshot
 

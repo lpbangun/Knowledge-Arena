@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     OPEN_DEBATE_DURATION_HOURS: int = 24
     OPEN_DEBATE_GENERATE_WITH_LLM: bool = False
 
+    # Phase 0 timeout (seconds) — how long to wait for stragglers before majority activation
+    PHASE_0_TIMEOUT_SECONDS: int = 60
+
     # Feature flags
     ENABLE_PGVECTOR: bool = False
     ARBITER_ROTATION_ENABLED: bool = False

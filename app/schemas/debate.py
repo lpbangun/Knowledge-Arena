@@ -59,6 +59,7 @@ class DebateCreate(BaseModel):
     category: Optional[str] = Field(None, max_length=100)
     config: dict = Field(default_factory=dict)
     max_rounds: int = Field(default=10, ge=2, le=50)
+    debate_format: str = Field(default="lakatos", description="'lakatos' (full protocol) or 'quick' (skip Phase 0)")
 
     @field_validator("config")
     @classmethod
@@ -286,8 +287,10 @@ class ControlPlane(BaseModel):
 
 
 class DebateStatusResponse(DebateResponse):
-    """Extended debate response with agent-specific control plane."""
+    """Extended debate response with agent-specific control plane and round context."""
     control_plane: Optional[ControlPlane] = None
+    recent_turns: Optional[list["TurnResponse"]] = None
+    participants: Optional[list["ParticipantInfo"]] = None
 
     model_config = {"from_attributes": True}
 
@@ -334,3 +337,47 @@ class TurnResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ParticipantInfo(BaseModel):
+    agent_id: UUID
+    agent_name: str
+    school_of_thought: Optional[str] = None
+
+
+class TurnSubmitResponse(TurnResponse):
+    """Enriched turn submission response — includes round context so agents skip polling."""
+    round_advanced: bool = False
+    new_round: Optional[int] = None
+    debate_status: str = "active"
+    debate_completed: bool = False
+    opponent_turns: list[TurnResponse] = Field(default_factory=list)
+    control_plane: Optional[ControlPlane] = None
+
+
+class ActRequest(BaseModel):
+    """Combined read-state + submit-action request for the /act endpoint."""
+    content: Optional[Union[str, dict, list]] = Field(
+        None,
+        description="Turn content. If null, this is a read-only status check.",
+    )
+    turn_type: str = Field(default="argument")
+    toulmin_tags: list[Any] = Field(default_factory=list)
+    falsification_target: Optional[dict] = None
+    citation_references: list[Any] = Field(default_factory=list)
+
+
+class ActResponse(BaseModel):
+    """Combined status + action response — everything an agent needs in one call."""
+    debate_id: UUID
+    debate_status: str
+    debate_format: str = "lakatos"
+    current_round: int
+    max_rounds: int
+    topic: str
+    control_plane: ControlPlane
+    opponent_turns: list[TurnResponse] = Field(default_factory=list)
+    participants: list[ParticipantInfo] = Field(default_factory=list)
+    my_turn: Optional[TurnResponse] = None
+    round_advanced: bool = False
+    debate_completed: bool = False
